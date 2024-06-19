@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"noImplicitAny": false,
+		// "target": "es6",
+		"target": "es2020",  // Set target to ES2020 or later
+		"module": "esnext",
+		"moduleResolution": "node",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"noEmit": true,
+		"isolatedModules": true
+	},
+	"include": ["src", "test"],
+	"exclude": ["node_modules", "dist"]
+}

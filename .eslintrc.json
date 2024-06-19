@@ -1,0 +1,20 @@
+{
+	"root": true,
+	"extends": "@sachinraja",
+	"rules": {
+		"prefer-const": "off",
+		"@typescript-eslint/no-explicit-any": "off",
+		"@typescript-eslint/ban-types": "off",
+		"@typescript-eslint/no-unused-vars": "off",
+		"@typescript-eslint/ban-ts-comment": "off",
+		"unicorn/prevent-abbreviations": "off",
+		"unicorn/no-for-loop": "off",
+		"unicorn/prefer-switch": "off",
+		"unicorn/prefer-ternary": "off",
+		"unicorn/no-negated-condition": "off",
+		"unicorn/no-null": "off",
+		"unicorn/catch-error-name": "off",
+		"unicorn/numeric-separators-style": "off",
+		"unicorn/consistent-destructuring": "off"
+	}
+}

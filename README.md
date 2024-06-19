@@ -1,2 +1,2 @@
 # eigensdk-js
-EigenLayer SDK in Javascript
+JS SDK for building AVSs on Eigenlayer
