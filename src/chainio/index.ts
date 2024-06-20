@@ -1,15 +1,6 @@
-import * as utils from './utils.js'
-import {AvsRegistryReader} from './clients/avsregistry/reader.js' 
-import {AvsRegistryWriter} from './clients/avsregistry/writer.js' 
-import {ELReader} from './clients/elcontracts/reader.js'
-import {ELWriter} from './clients/elcontracts/writer.js'
-import * as builder from './clients/builder.js'
-
-export default {
-	utils,
-	AvsRegistryReader,
-	AvsRegistryWriter,
-	ELReader,
-	ELWriter,
-	builder,
-}
+export * as utils from './utils.js'
+export {AvsRegistryReader} from './clients/avsregistry/reader.js' 
+export {AvsRegistryWriter} from './clients/avsregistry/writer.js' 
+export {ELReader} from './clients/elcontracts/reader.js'
+export {ELWriter} from './clients/elcontracts/writer.js'
+export * as builder from './clients/builder.js'

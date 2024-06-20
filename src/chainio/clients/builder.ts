@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import { Web3 } from 'web3';
 import { AbiItem } from 'web3-utils';
-import pino from 'pino';
+import pino, { Logger } from 'pino';
 import * as ABIs from '../../contracts/ABIs.js';
 
 import {AvsRegistryReader} from './avsregistry/reader';
@@ -171,7 +171,7 @@ export class Clients {
     }
 }
 
-export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string): Promise<Clients> {
+export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string, logger: Logger): Promise<Clients> {
     const ethHttpClient = new Web3(new Web3.providers.HttpProvider(config.ethHttpUrl));
     const pkWallet = new ethers.Wallet(ecdsaPrivateKey);
 
