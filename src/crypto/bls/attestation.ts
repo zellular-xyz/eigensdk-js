@@ -57,6 +57,10 @@ export class G1Point extends mcl.G1{
 		res.setStr(val)
 		return res;
 	}
+
+	static fromMclG1(p: mcl.G1): G1Point {
+		return G1Point.fromStr(p.getStr());
+	}
 }
 
 export function newG1Point(x: bigint, y: bigint): G1Point {
