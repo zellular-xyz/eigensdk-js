@@ -1,25 +1,25 @@
 // import { ethers } from "ethers";
 import { Logger } from "pino";
 // import { ELReader, G1Point, KeyPair, TxReceipt, utils, sendTransaction } from "./utils";
-import {ELReader} from '../elcontracts/reader.js'
+import {ELReader} from '../elcontracts/reader'
 import { Web3, Contract, Address, TransactionReceipt } from "web3";
-import { G1Point, KeyPair, Signature } from "../../../crypto/bls/attestation.js";
-import * as chainIoUtils from '../../utils.js'
-import * as ABIs from '../../../contracts/ABIs.js'
-import { LocalAccount } from "../../../types/general.js";
+import { G1Point, KeyPair, Signature } from "../../../crypto/bls/attestation";
+import * as chainIoUtils from '../../utils'
+import * as ABIs from '../../../contracts/ABIs'
+import { LocalAccount } from "../../../types/general";
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000;
 
 export class AvsRegistryWriter {
-    private serviceManagerAddr: Address;
-    private registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR>;
-    private operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER>;
-    private stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY>;
-    private blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY>;
-    private elReader: ELReader;
-    private logger: Logger;
-    private ethHttpClient: Web3;
-    private pkWallet: LocalAccount;
+    serviceManagerAddr: Address;
+    registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR>;
+    operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER>;
+    stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY>;
+    blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY>;
+    elReader: ELReader;
+    logger: Logger;
+    ethHttpClient: Web3;
+    pkWallet: LocalAccount;
 
     constructor(
         serviceManagerAddr: Address,
@@ -61,6 +61,8 @@ export class AvsRegistryWriter {
         });
 
         const g1HashedMsgToSign = await this.registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddr).call();
+		if(!g1HashedMsgToSign)
+			throw `Unable to get pubkeyRegistrationMessageHash`
         const signedMsg: Signature = blsKeyPair.signHashedToCurveMessage(new G1Point(
 			BigInt(g1HashedMsgToSign[0]),
 			BigInt(g1HashedMsgToSign[1]),

@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
-import mcl, { G1 } from 'mcl-wasm'
-import * as bn254Utils from "../bn254/utils.js"
+import {eth as Web3Eth} from 'web3'
+import * as mcl from 'mcl-wasm'
+import * as bn254Utils from "../bn254/utils"
 const fs = require('fs').promises;
 
 export async function init() {
@@ -197,7 +198,13 @@ export class KeyPair {
 		const data = await fs.readFile(path, 'utf-8');
 		const keystoreJson = JSON.parse(data);
 
-		let keystoreAccount = await ethers.decryptKeystoreJson(keystoreJson.crypto, password)
+		if (!keystoreJson.address)
+			keystoreJson.id = "00000000-0000-0000-0000-000000000000"
+
+		if (!keystoreJson.address) 
+			keystoreJson.address = "0x0000000000000000000000000000000000000000"
+
+		let keystoreAccount = await Web3Eth.accounts.decrypt(keystoreJson, password)
 		return KeyPair.fromString(keystoreAccount.privateKey, 16)
 	}
 

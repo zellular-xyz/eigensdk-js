@@ -1,10 +1,10 @@
 import { Address, Contract, Web3 } from 'web3';
 import {Logger} from 'pino'
-import * as ABIs from '../../../contracts/ABIs.js'
-import * as chainioUtils from '../../utils.js'
+import * as ABIs from '../../../contracts/ABIs'
+import * as chainioUtils from '../../utils'
 import { OperatorPubkeys, OperatorStateRetrieverCheckSignaturesIndices, OperatorStateRetrieverOperator } from '../../../services/avsregistry/avsregistry.js';
-import { Uint8 } from '../../../types/general.js';
-import { G1Point, G2Point } from '../../../crypto/bls/attestation.js';
+import { BlockNumber, OperatorId, QuorumNum, Uint8 } from '../../../types/general';
+import { G1Point, G2Point } from '../../../crypto/bls/attestation';
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000
 
@@ -127,12 +127,12 @@ export class AvsRegistryReader {
     }
 
     async getCheckSignaturesIndices(
-        referenceBlockNumber: number,
-        quorumNumbers: number[],
-        nonSignerOperatorIds: number[]
+        referenceBlockNumber: BlockNumber,
+        quorumNumbers: QuorumNum[],
+        nonSignerOperatorIds: OperatorId[]
     ): Promise<OperatorStateRetrieverCheckSignaturesIndices> {
         const nonSignerOperatorIdsBytes = nonSignerOperatorIds.map(operatorId => 
-            Buffer.from(operatorId.toString(16).padStart(64, '0'), 'hex')
+            Buffer.from(operatorId, 'hex')
         );
         const checkSignatureIndices = await this.operatorStateRetriever.methods.getCheckSignaturesIndices(
             this.registryCoordinatorAddr,
@@ -140,6 +140,9 @@ export class AvsRegistryReader {
             chainioUtils.numsToBytes(quorumNumbers),
             nonSignerOperatorIdsBytes
         ).call();
+
+		if(!checkSignatureIndices)
+			throw `Unable to get signature check indices`
 
         return {
             nonSignerQuorumBitmapIndices: checkSignatureIndices[0],
@@ -149,11 +152,11 @@ export class AvsRegistryReader {
         };
     }
 
-    async getOperatorId(operatorAddress: Address): Promise<Buffer> {
+    async getOperatorId(operatorAddress: Address): Promise<OperatorId> {
         return await this.registryCoordinator.methods.getOperatorId(operatorAddress).call();
     }
 
-    async getOperatorFromId(operatorId: Buffer): Promise<Address> {
+    async getOperatorFromId(operatorId: OperatorId): Promise<Address> {
         return this.registryCoordinator.methods.getOperatorFromId(operatorId).call();
     }
 

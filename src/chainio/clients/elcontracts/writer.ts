@@ -1,5 +1,5 @@
 import {Logger} from 'pino'
-import { Operator } from '../../../services/avsregistry/avsregistry.js';
+import { Operator } from '../../../services/avsregistry/avsregistry';
 import { 
 	Contract, 
 	Web3, 
@@ -7,10 +7,10 @@ import {
 	TransactionReceipt
 } from "web3";
 // import {TxReceipt, LocalAccount } from "web3";
-import * as ABIs from '../../../contracts/ABIs.js'
-import {sendTransaction} from "../../utils.js";
-import { ELReader } from './reader.js';
-import { LocalAccount } from '../../../types/general.js';
+import * as ABIs from '../../../contracts/ABIs'
+import {sendTransaction} from "../../utils";
+import { ELReader } from './reader';
+import { LocalAccount } from '../../../types/general';
 
 
 export class ELWriter {

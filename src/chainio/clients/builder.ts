@@ -2,13 +2,13 @@ import { ethers } from 'ethers';
 import { Web3 } from 'web3';
 import { AbiItem } from 'web3-utils';
 import pino, { Logger } from 'pino';
-import * as ABIs from '../../contracts/ABIs.js';
+import * as ABIs from '../../contracts/ABIs';
 
 import {AvsRegistryReader} from './avsregistry/reader';
 import {AvsRegistryWriter} from './avsregistry/writer';
 import {ELReader} from './elcontracts/reader';
 import {ELWriter} from './elcontracts/writer';
-import { LocalAccount } from '../../types/general.js';
+import { LocalAccount } from '../../types/general';
 
 const logger = pino({ level: 'info' });
 

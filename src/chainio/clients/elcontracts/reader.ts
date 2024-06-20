@@ -1,7 +1,7 @@
 import {Logger} from 'pino'
 import { Contract, Web3, Address } from "web3";
-import * as ABIs from '../../../contracts/ABIs.js'
-import { Operator } from '../../../services/avsregistry/avsregistry.js';
+import * as ABIs from '../../../contracts/ABIs'
+import { Operator } from '../../../services/avsregistry/avsregistry';
 
 export class ELReader {
   constructor(
