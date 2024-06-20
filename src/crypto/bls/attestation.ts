@@ -187,16 +187,20 @@ export class KeyPair {
 		// @ts-ignore
 		const privateKey = "0x" + this.privKey.getStr(16).padStart(64, "0")
 		let wallet = new ethers.Wallet(privateKey)
-		let keystoreJson = {
-			pubKey: this.pubG1.getStr(),
-			crypto: await ethers.encryptKeystoreJson({address: wallet.address, privateKey}, password)
-		}
+		// let keystoreJson = {
+		// 	pubKey: this.pubG1.getStr(),
+		// 	crypto: await ethers.encryptKeystoreJson({address: wallet.address, privateKey}, password)
+		// }
+		let keystoreJson = await Web3Eth.accounts.encrypt(wallet.privateKey, password);
+		// @ts-ignore
+		keystoreJson.pubKey = this.pubG1.getStr()
 		await fs.writeFile(path, JSON.stringify(keystoreJson), "utf-8")
 	}
 
 	static async readFromFile(path: string, password: string): Promise<KeyPair> {
 		const data = await fs.readFile(path, 'utf-8');
 		const keystoreJson = JSON.parse(data);
+		console.log(keystoreJson)
 
 		if (!keystoreJson.address)
 			keystoreJson.id = "00000000-0000-0000-0000-000000000000"

@@ -244,7 +244,7 @@ export class BlsAggregationService implements IBlsAggregationService {
                 ...indices
 			} as BlsAggregationServiceResponse;
 
-            // this.aggregatedResponses[taskIndex].promise.resolve(result)
+            this.aggregatedResponses[taskIndex].promise.resolve(result)
 			await this.aggregatedResponseChannel.enqueue(result)
 		}
 	}
@@ -252,14 +252,17 @@ export class BlsAggregationService implements IBlsAggregationService {
 	getAggregatedResponseChannel(): AsyncQueue {
         // return await wait_for(self.aggregated_responses_c[task_index].future)
 		return this.aggregatedResponseChannel;
-        // try{
-        //     const result = await this.aggregatedResponses[taskIndex].promise.waitToFulfill();
-        //     return result
-		// }
-		// catch(err) {
-		// 	// @ts-ignore
-        //     return {err}
-		// }
+	}
+
+	async getAggregatedResponse(taskIndex: TaskIndex) {
+        try{
+            const result = await this.aggregatedResponses[taskIndex].promise.waitToFulfill();
+            return result
+		}
+		catch(err) {
+			// @ts-ignore
+            return {err}
+		}
 	}
 
     private stakeThresholdsMet(
