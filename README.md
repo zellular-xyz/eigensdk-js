@@ -20,7 +20,7 @@ $ npm run test
 
 ## Examples
 
-Aggregate BLS signatures and verify using aggregated public keys
+Aggregate BLS signatures and verify using aggregated public key
 
 ```typescript
 
