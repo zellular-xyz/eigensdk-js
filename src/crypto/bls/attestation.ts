@@ -113,10 +113,7 @@ export function newZeroG2Point(): G2Point {
 export class Signature extends G1Point {
 
 	static fromG1Point(p: G1Point): Signature {
-		return new Signature(
-			BigInt(p.getX().getStr()),
-			BigInt(p.getY().getStr())
-		)
+		return Signature.fromStr(p.getStr())
 	}
 
 	toJson(): Object {
