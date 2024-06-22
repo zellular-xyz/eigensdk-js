@@ -45,3 +45,49 @@ const aggregatedPubG2:G2Point = keyPair1.pubG2.add(keyPair2.pubG2)
 
 const verified = aggregatedSignature.verify(aggregatedPubG2, msgHash)
 ```
+
+## Example #2 
+Find the list of operators registered on EigenDA, a sample AVS:
+```typescript
+import {BuildAllConfig, buildAll} from '../chainio/clients/builder'
+import pino from 'pino'
+
+async function run() {
+	const config = new BuildAllConfig(
+		'https://ethereum-rpc.publicnode.com',
+		'0x0BAAc79acD45A023E19345c352d8a7a83C4e5656',
+		'0xD5D7fB4647cE79740E6e83819EFDf43fa74F8C31'
+	)
+
+	const logger = pino({ level: 'info' });
+
+	const clients = await buildAll(config, "01".padStart(64, '0'), logger)
+
+	const quorums = await clients.avsRegistryReader.getOperatorsStakeInQuorumsAtCurrentBlock([0, 1])
+
+	console.log(quorums)
+}
+
+run()
+	.catch(e => console.log(e))
+	.finally(() => process.exit(0))
+```
+#### Output:
+```cmd
+[
+  [
+    {
+      operator: '0x4Cd2...Bd0a',
+      operatorId: '0x62fd...e8ee',
+      stake: 46234599345769649597926n
+    },
+    {
+      operator: '0xe580...fbFa',
+      operatorId: '0x3a6f...f567',
+      stake: 809492531621623334023n
+    },
+	...
+  ],
+  ...
+]
+```
