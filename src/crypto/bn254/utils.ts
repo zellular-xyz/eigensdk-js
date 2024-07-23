@@ -106,11 +106,33 @@ export function getG1Generator() {
 	G1.setStr(`1 1 2`);
 	return G1
 }
+export function createFp(x: bigint): mcl.Fp {
+	let p = new mcl.Fp()
+	p.setStr(`${x}`, 10)
+	return p;
+}
+
+export function createFp2(a:bigint, b:bigint): mcl.Fp2 {
+	const fp2_a = new mcl.Fp();
+	const fp2_b = new mcl.Fp();
+	fp2_a.setStr(`${a}`, 10);
+	fp2_b.setStr(`${b}`, 10);
+	const fp2 = new mcl.Fp2();
+	fp2.set_a(fp2_a);
+	fp2.set_b(fp2_b);
+	return fp2;
+}
+
+export function createG2(xa: bigint, xb: bigint, ya: bigint, yb: bigint): mcl.G2 {
+	let G2 = new mcl.G2()
+	G2.setX(createFp2(xa, xb));
+	G2.setY(createFp2(ya, yb));
+	G2.setZ(createFp2(1n, 0n));
+	return G2
+}
 
 export function getG2Generator() {
-	let G2 = new mcl.G2()
-	G2.setStr(`1 ${_G2_XA} ${_G2_XB} ${_G2_YA} ${_G2_YB}`)
-	return G2
+	return createG2(_G2_XA, _G2_XB, _G2_YA, _G2_YB)
 }
 
 export function mulByGeneratorG1(a: mcl.Fr): mcl.G1 {

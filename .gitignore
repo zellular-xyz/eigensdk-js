@@ -2,3 +2,4 @@
 node_modules
 dist
 test-keystore-save.json
+*.code-workspace

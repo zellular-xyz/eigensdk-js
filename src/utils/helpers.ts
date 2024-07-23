@@ -73,12 +73,12 @@ export function g1PointToArgs(p: G1Point): {X: string, Y: string} {
 export function g2PointToArgs(p: G2Point): {X: string[], Y: string[]} {
 	return {
 		X: [
-			"0x" + p.getX().get_a().getStr(16).padStart(64, '0'),
 			"0x" + p.getX().get_b().getStr(16).padStart(64, '0'),
+			"0x" + p.getX().get_a().getStr(16).padStart(64, '0'),
 		],
 		Y: [
-			"0x" + p.getY().get_a().getStr(16).padStart(64, '0'),
 			"0x" + p.getY().get_b().getStr(16).padStart(64, '0'),
+			"0x" + p.getY().get_a().getStr(16).padStart(64, '0'),
 		]
 	}
 }

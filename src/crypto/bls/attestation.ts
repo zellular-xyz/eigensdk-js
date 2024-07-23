@@ -13,27 +13,14 @@ type encryptedBLSKeyJSONV3 = {
 	crypto: any
 }
 
-export function newFpElement(x: bigint): mcl.Fp {
-	let p = new mcl.Fp()
-	p.setStr(`${x}`, 10)
-	return p;
-}
-
-export function newFp2Element(a: bigint, b: bigint): mcl.Fp2 {
-	let p = new mcl.Fp2()
-	p.set_a(newFpElement(a))
-	p.set_b(newFpElement(b))
-	return p;
-}
-
 export class G1Point extends mcl.G1{
 
 	constructor(x: bigint, y: bigint) {
 		super()
 		if(x != undefined) {
-			this.setX(newFpElement(x));
-			this.setY(newFpElement(y));
-			this.setZ(newFpElement(1n));
+			this.setX(bn254Utils.createFp(x));
+			this.setY(bn254Utils.createFp(y));
+			this.setZ(bn254Utils.createFp(1n));
 			if(x===0n && y===0n)
 				this.clear()
 		}
@@ -75,9 +62,9 @@ export class G2Point extends mcl.G2 {
 	constructor(xa: bigint, xb: bigint, ya: bigint, yb: bigint) {
 		super()
 		if(xa != undefined) {
-			this.setX(newFp2Element(xa, xb))
-			this.setY(newFp2Element(ya, yb))
-			this.setZ(newFp2Element(1n, 0n))
+			this.setX(bn254Utils.createFp2(xa, xb))
+			this.setY(bn254Utils.createFp2(ya, yb))
+			this.setZ(bn254Utils.createFp2(1n, 0n))
 			if(xa===0n && xb===0n && ya===0n && yb===0n)
 				this.clear()
 		}
