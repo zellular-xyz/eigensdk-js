@@ -18,124 +18,176 @@ const logger = pino({
 });
 
 export class BuildAllConfig {
-    ethHttpUrl: string;
-    registryCoordinatorAddr: string;
-    operatorStateRetrieverAddr: string;
-    avsName?: string;
-    promMetricsIpPortAddress?: string;
 
     constructor(
-        ethHttpUrl: string,
-        registryCoordinatorAddr: string,
-        operatorStateRetrieverAddr: string,
-        avsName?: string,
-        promMetricsIpPortAddress?: string
-    ) {
-        this.ethHttpUrl = ethHttpUrl;
-        this.registryCoordinatorAddr = registryCoordinatorAddr;
-        this.operatorStateRetrieverAddr = operatorStateRetrieverAddr;
-        this.avsName = avsName;
-        this.promMetricsIpPortAddress = promMetricsIpPortAddress;
-    }
+        public readonly ethHttpUrl: string,
+        public readonly registryCoordinatorAddr: string,
+        public readonly operatorStateRetrieverAddr: string,
+        public readonly rewardsCoordinatorAddr: string,
+        public readonly permissionControllerAddr: string,
+        public readonly serviceManagerAddr: string,
+        public readonly allocationManagerAddr: string,
+        public readonly delegationManagerAddr: string,
+        public readonly avsName: string,
+        public readonly promMetricsIpPortAddress?: string
+    ) {}
 
-    async buildElClients(pkWallet: LocalAccount): Promise<[ELReader, ELWriter]> {
+    async buildElClients(ecdsaPrivateKey: string): Promise<[ELReader, ELWriter]> {
         const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.ethHttpUrl));
+        const pkWallet: LocalAccount = {
+            address: new ethers.Wallet(ecdsaPrivateKey).address,
+            privateKey: ecdsaPrivateKey.replace("0x", ""),
+        };
+
         const registryCoordinator = new ethHttpClient.eth.Contract(
-			ABIs.REGISTRY_COORDINATOR as AbiItem[], 
-			this.registryCoordinatorAddr
-		);
+            ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr)
+        );
+        logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
-        const stakeRegistryAddr:string = await registryCoordinator.methods.stakeRegistry().call();
+        const stakeRegistryAddr: string = await registryCoordinator.methods.stakeRegistry().call();
         const stakeRegistry = new ethHttpClient.eth.Contract(
-			ABIs.STAKE_REGISTRY as AbiItem[], 
-			stakeRegistryAddr
-		);
+            ABIs.STAKE_REGISTRY_ABI as AbiItem[],
+            stakeRegistryAddr
+        );
+        logger.info(`stake_registry_instance: ${stakeRegistry.options.address}`);
 
-        const delegationManagerAddr:string = await stakeRegistry.methods.delegation().call();
+        const delegationManagerAddr: string = await stakeRegistry.methods.delegation().call();
         const delegationManager = new ethHttpClient.eth.Contract(
-			ABIs.DELEGATION_MANAGER as AbiItem[], 
-			delegationManagerAddr
-		);
+            ABIs.DELEGATION_MANAGER_ABI as AbiItem[],
+            delegationManagerAddr
+        );
+        logger.info(`delegation_manager_instance: ${delegationManager.options.address}`);
 
-        const slasherAddr:string = await delegationManager.methods.slasher().call();
-        const slasher = new ethHttpClient.eth.Contract(ABIs.SLASHER as AbiItem[], slasherAddr);
+        const strategyManagerAddr: string = await delegationManager.methods.strategyManager().call();
+        const strategyManager = new ethHttpClient.eth.Contract(
+            ABIs.STRATEGY_MANAGER_ABI as AbiItem[],
+            strategyManagerAddr
+        );
+        logger.info(`strategy_manager_instance: ${strategyManager.options.address}`);
 
-        const strategyManagerAddr:string = await delegationManager.methods.strategyManager().call();
-        const strategyManager = new ethHttpClient.eth.Contract(ABIs.STRATEGY_MANAGER as AbiItem[], strategyManagerAddr);
+        const serviceManager = new ethHttpClient.eth.Contract(
+            ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr)
+        );
+        logger.info(`service_manager_instance: ${serviceManager.options.address}`);
 
-        const serviceManagerAddr:string = await registryCoordinator.methods.serviceManager().call();
-        const serviceManager = new ethHttpClient.eth.Contract(ABIs.SERVICE_MANAGER as AbiItem[], serviceManagerAddr);
+        const allocationManager = new ethHttpClient.eth.Contract(
+            ABIs.ALLOCATION_MANAGER_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.allocationManagerAddr)
+        );
+        logger.info(`allocation_manager_instance: ${allocationManager.options.address}`);
 
-        const avsDirectoryAddr:string  = await serviceManager.methods.avsDirectory().call();
-        const avsDirectory = new ethHttpClient.eth.Contract(ABIs.AVS_DIRECTORY as AbiItem[], avsDirectoryAddr);
+        const permissionController = new ethHttpClient.eth.Contract(
+            ABIs.PERMISSION_CONTROLLER_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.permissionControllerAddr)
+        );
+        logger.info(`permission_controller_instance: ${permissionController.options.address}`);
+
+        const avsDirectoryAddr: string = await serviceManager.methods.avsDirectory().call();
+        const avsDirectory = new ethHttpClient.eth.Contract(
+            ABIs.AVS_DIRECTORY_ABI as AbiItem[],
+            avsDirectoryAddr
+        );
+        logger.info(`avs_directory_instance: ${avsDirectory.options.address}`);
+
+        const rewardsCoordinator = new ethHttpClient.eth.Contract(
+            ABIs.REWARDS_COORDINATOR_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.rewardsCoordinatorAddr)
+        );
+        logger.info(`rewards_coordinator_instance: ${rewardsCoordinator.options.address}`);
 
         const elReaderInstance = new ELReader(
-            slasher,
-            delegationManager,
-            strategyManager,
+            allocationManager,
             avsDirectory,
+            delegationManager,
+            permissionController,
+            rewardsCoordinator,
+            strategyManager,
             logger,
-            ethHttpClient
+            ethHttpClient,
+            ABIs.I_STRATEGY_ABI,
+            ABIs.IERC20_ABI
         );
 
         const elWriterInstance = new ELWriter(
-            slasher,
-            delegationManager,
-            strategyManager,
-            strategyManagerAddr,
+            allocationManager,
             avsDirectory,
+            delegationManager,
+            permissionController,
+            rewardsCoordinator,
+            registryCoordinator,
+            strategyManager,
             elReaderInstance,
-            logger,
             ethHttpClient,
-            pkWallet
+            logger,
+            pkWallet,
+            ABIs.I_STRATEGY_ABI,
+            ABIs.IERC20_ABI
         );
 
         return [elReaderInstance, elWriterInstance];
     }
 
     async buildAvsRegistryClients(
-        elReader: ELReader,
-    	pkWallet: LocalAccount
+        ecdsaPrivateKey: string,
+        elReader: ELReader
     ): Promise<[AvsRegistryReader, AvsRegistryWriter]> {
         const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.ethHttpUrl));
-        const registryCoordinator = new ethHttpClient.eth.Contract(
-			ABIs.REGISTRY_COORDINATOR as AbiItem[], 
-			this.registryCoordinatorAddr
-		);
-        const serviceManagerAddr:string = await registryCoordinator.methods.serviceManager().call();
+        const pkWallet: LocalAccount = {
+            address: new ethers.Wallet(ecdsaPrivateKey).address,
+            privateKey: ecdsaPrivateKey.replace("0x", ""),
+        };
 
-        const blsApkRegistryAddr:string  = await registryCoordinator.methods.blsApkRegistry().call();
-        const blsApkRegistry = new ethHttpClient.eth.Contract(
-			ABIs.BLS_APK_REGISTRY as AbiItem[], 
-			blsApkRegistryAddr
-		);
+        const registryCoordinator = new ethHttpClient.eth.Contract(
+            ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr)
+        );
+        logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
         const operatorStateRetriever = new ethHttpClient.eth.Contract(
-			ABIs.OPERATOR_STATE_RETRIEVER as AbiItem[], 
-			this.operatorStateRetrieverAddr
-		);
+            ABIs.OPERATOR_STATE_RETRIEVER_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.operatorStateRetrieverAddr)
+        );
+        logger.info(`operator_state_retriever_instance: ${operatorStateRetriever.options.address}`);
 
-        const stakeRegistryAddr:string = await registryCoordinator.methods.stakeRegistry().call();
+        const blsApkRegistryAddr: string = await registryCoordinator.methods.blsApkRegistry().call();
+        const blsApkRegistry = new ethHttpClient.eth.Contract(
+            ABIs.BLS_APK_REGISTRY_ABI as AbiItem[],
+            blsApkRegistryAddr
+        );
+        logger.info(`bls_apk_registry_instance: ${blsApkRegistry.options.address}`);
+
+        const serviceManager = new ethHttpClient.eth.Contract(
+            ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
+            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr)
+        );
+        logger.info(`service_manager_instance: ${serviceManager.options.address}`);
+
+        const stakeRegistryAddr: string = await registryCoordinator.methods.stakeRegistry().call();
         const stakeRegistry = new ethHttpClient.eth.Contract(
-			ABIs.STAKE_REGISTRY as AbiItem[], 
-			stakeRegistryAddr
-		);
+            ABIs.STAKE_REGISTRY_ABI as AbiItem[],
+            stakeRegistryAddr
+        );
+        logger.info(`stake_registry_instance: ${stakeRegistry.options.address}`);
 
         const avsRegistryReader = new AvsRegistryReader(
-            this.registryCoordinatorAddr,
             registryCoordinator,
-            blsApkRegistryAddr,
+            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr),
             blsApkRegistry,
+            blsApkRegistryAddr,
             operatorStateRetriever,
+            serviceManager,
             stakeRegistry,
             logger,
             ethHttpClient
         );
 
         const avsRegistryWriter = new AvsRegistryWriter(
-            serviceManagerAddr,
             registryCoordinator,
             operatorStateRetriever,
+            serviceManager,
+            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr),
             stakeRegistry,
             blsApkRegistry,
             elReader,
@@ -149,44 +201,29 @@ export class BuildAllConfig {
 }
 
 export class Clients {
-    avsRegistryReader: AvsRegistryReader;
-    avsRegistryWriter: AvsRegistryWriter;
-    elReader: ELReader;
-    elWriter: ELWriter;
-    ethHttpClient: Web3;
-    wallet: LocalAccount;
-    metrics: any;
-
     constructor(
-        avsRegistryReader: AvsRegistryReader,
-        avsRegistryWriter: AvsRegistryWriter,
-        elReader: ELReader,
-        elWriter: ELWriter,
-        ethHttpClient: Web3,
-        wallet: LocalAccount,
-        metrics: any
-    ) {
-        this.avsRegistryReader = avsRegistryReader;
-        this.avsRegistryWriter = avsRegistryWriter;
-        this.elReader = elReader;
-        this.elWriter = elWriter;
-        this.ethHttpClient = ethHttpClient;
-        this.wallet = wallet;
-        this.metrics = metrics;
-    }
+        public readonly avsRegistryReader: AvsRegistryReader,
+        public readonly avsRegistryWriter: AvsRegistryWriter,
+        public readonly elReader: ELReader,
+        public readonly elWriter: ELWriter,
+        public readonly ethHttpClient: Web3,
+        public readonly wallet: LocalAccount,
+        public readonly metrics: any
+    ) {}
 }
 
-export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string, logger: Logger): Promise<Clients> {
+export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string, logger?: Logger): Promise<Clients> {
     const ethHttpClient = new Web3(new Web3.providers.HttpProvider(config.ethHttpUrl));
+    console.log({config, ecdsaPrivateKey})
 	const wallet = new ethers.Wallet(ecdsaPrivateKey);
     const pkWallet:LocalAccount = {
 		address: wallet.address,
 		privateKey: ecdsaPrivateKey.replace("0x", "")
 	}
 
-    const [elReader, elWriter] = await config.buildElClients(pkWallet);
+    const [elReader, elWriter] = await config.buildElClients(ecdsaPrivateKey);
 
-    const [avsRegistryReader, avsRegistryWriter] = await config.buildAvsRegistryClients(elReader, pkWallet);
+    const [avsRegistryReader, avsRegistryWriter] = await config.buildAvsRegistryClients(ecdsaPrivateKey, elReader);
 
     return new Clients(
         avsRegistryReader,

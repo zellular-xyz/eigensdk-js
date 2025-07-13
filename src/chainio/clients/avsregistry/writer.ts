@@ -1,213 +1,262 @@
 // import { ethers } from "ethers";
-import { Logger } from "pino";
+import { pino, Logger } from "pino";
 // import { ELReader, G1Point, KeyPair, TxReceipt, utils, sendTransaction } from "./utils";
-import {ELReader} from '../elcontracts/reader'
+import { ELReader } from '../elcontracts/reader'
 import { Web3, Contract, Address, TransactionReceipt } from "web3";
+import { ethers } from 'ethers'
 import { G1Point, KeyPair, Signature } from "../../../crypto/bls/attestation";
 import * as chainIoUtils from '../../utils'
 import * as ABIs from '../../../contracts/ABIs'
-import { LocalAccount } from "../../../types/general";
+import { LocalAccount, OperatorDirectedRewardsSubmissions, OperatorSetParams, QuorumNum, RewardsSubmission, StrategyParams, Uint16, Uint256, Uint32, Uint96 } from "../../../types/general";
 import { signRawData } from "../../../utils/helpers";
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000;
+const logger = pino({ name: "AvsRegWriter" })
+
 
 export class AvsRegistryWriter {
     serviceManagerAddr: Address;
-    registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR>;
-    operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER>;
-    stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY>;
-    blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY>;
+    serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>;
+    registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>;
+    operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>;
+    stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>;
+    blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>;
     elReader: ELReader;
     logger: Logger;
     ethHttpClient: Web3;
     pkWallet: LocalAccount;
+    transactor: chainIoUtils.Transactor;
 
     constructor(
+        registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
+        operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>,
+        serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>,
         serviceManagerAddr: Address,
-        registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR>,
-        operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER>,
-        stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY>,
-        blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY>,
+        stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>,
+        blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>,
         elReader: ELReader,
         logger: Logger,
         ethHttpClient: Web3,
         pkWallet: LocalAccount,
     ) {
-        this.serviceManagerAddr = serviceManagerAddr;
         this.registryCoordinator = registryCoordinator;
         this.operatorStateRetriever = operatorStateRetriever;
+        this.serviceManager = serviceManager;
+        this.serviceManagerAddr = serviceManagerAddr;
         this.stakeRegistry = stakeRegistry;
         this.blsApkRegistry = blsApkRegistry;
         this.elReader = elReader;
         this.logger = logger;
+
         this.ethHttpClient = ethHttpClient;
         this.pkWallet = pkWallet;
+
+        this.transactor = new chainIoUtils.Transactor(pkWallet, ethHttpClient);
     }
 
-    async registerOperatorInQuorumWithAvsRegistryCoordinator(
-        operatorEcdsaPrivateKey: string,
-        operatorToAvsRegistrationSigSalt: string,
-        operatorToAvsRegistrationSigExpiry: number,
-        blsKeyPair: KeyPair,
-        quorumNumbers: number[],
-        socket: string,
-    ): Promise<TransactionReceipt | null> {
-        const account = this.ethHttpClient.eth.accounts.privateKeyToAccount(operatorEcdsaPrivateKey);
-        const operatorAddr = account.address;
-        this.logger.info({
-            "avs-service-manager": this.serviceManagerAddr,
-            "operator": operatorAddr,
-            "quorumNumbers": quorumNumbers,
-            "socket": socket,
-        }, "Registering operator with the AVS's registry coordinator");
-
-        const g1HashedMsgToSign = await this.registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddr).call();
-		if(!g1HashedMsgToSign)
-			throw `Unable to get pubkeyRegistrationMessageHash`
-        const signedMsg: Signature = blsKeyPair.signHashedToCurveMessage(new G1Point(
-			g1HashedMsgToSign[0],
-			g1HashedMsgToSign[1],
-		));
-        const pubkeyRegParams = [
-            {X: signedMsg.getX().getStr(), Y: signedMsg.getY().getStr()},
-            {X: blsKeyPair.pubG1.getX().getStr(), Y: blsKeyPair.pubG1.getY().getStr()},
-            {
-                X: [blsKeyPair.pubG2.getX().get_b().getStr(), blsKeyPair.pubG2.getX().get_a().getStr()],
-                Y: [blsKeyPair.pubG2.getY().get_b().getStr(), blsKeyPair.pubG2.getY().get_a().getStr()],
-			},
-        ];
-        const msgToSign:string = await this.elReader.calculateOperatorAvsRegistrationDigestHash(
-            operatorAddr,
-            this.serviceManagerAddr,
-            operatorToAvsRegistrationSigSalt,
-            operatorToAvsRegistrationSigExpiry,
-        );
-        const operatorSignature = signRawData(msgToSign, operatorEcdsaPrivateKey)
-
-        const operatorSignatureWithSaltAndExpiry = [
-			// @ts-ignore
-            operatorSignature,
-            operatorToAvsRegistrationSigSalt,
-            operatorToAvsRegistrationSigExpiry,
-        ];
-        try {
-            const receipt = await chainIoUtils.sendContractCall(
-				this.registryCoordinator, 
-				"registerOperator",
-				[
-					chainIoUtils.numsToBytes(quorumNumbers),
-					socket,
-					pubkeyRegParams,
-					operatorSignatureWithSaltAndExpiry,
-				],
-				this.pkWallet, 
-				this.ethHttpClient
-			);
-            this.logger.info({
-                "txHash": receipt.transactionHash,
-                "avs-service-manager": this.serviceManagerAddr,
-                "operator": operatorAddr,
-                "quorumNumbers": quorumNumbers,
-            }, "Successfully registered operator with AVS registry coordinator");
-            return receipt;
-        } catch (e) {
-            this.logger.error(e);
-            return null;
-        }
+    async sendTransaction(contract: Contract<any>, method: string, params: any[]): Promise<TransactionReceipt> {
+        return this.transactor.send(contract, method, params)
     }
 
     async updateStakesOfEntireOperatorSetForQuorums(
-        operatorsPerQuorum: Address[][],
-        quorumNumbers: number[],
-    ): Promise<TransactionReceipt | null> {
-        this.logger.info("Updating stakes for entire operator set", {
-            "quorumNumbers": quorumNumbers,
-        });
-
-        try {
-            const receipt = await chainIoUtils.sendContractCall(
-				this.registryCoordinator,
-				"updateOperatorsForQuorum",
-				[operatorsPerQuorum, chainIoUtils.numsToBytes(quorumNumbers)], 
-				this.pkWallet, 
-				this.ethHttpClient
-			);
-            this.logger.info("Successfully updated stakes for entire operator set", {
-                "txHash": receipt.transactionHash,
-                "quorumNumbers": quorumNumbers,
-            });
-            return receipt;
-        } catch (e) {
-            this.logger.error(e);
-            return null;
-        }
+        operatorsPerQuorum: string[][],
+        quorumNumbers: QuorumNum[]
+    ): Promise<TransactionReceipt> {
+        const quorumBytes = chainIoUtils.numsToBytes(quorumNumbers.map(Number));
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'updateOperatorsForQuorum',
+            [operatorsPerQuorum, quorumBytes]
+        );
     }
 
-    async updateStakesOfOperatorSubsetForAllQuorums(operators: Address[]): Promise<TransactionReceipt | null> {
-        this.logger.info("Updating stakes of operator subset for all quorums", {
-            "operators": operators,
-        });
-
-        try {
-            const receipt = await chainIoUtils.sendContractCall(
-				this.registryCoordinator,
-				"updateOperators",
-				[operators], 
-				this.pkWallet, 
-				this.ethHttpClient
-			);
-            this.logger.info("Successfully updated stakes of operator subset for all quorums", {
-                "txHash": receipt.transactionHash,
-                "operators": operators,
-            });
-            return receipt;
-        } catch (e) {
-            this.logger.error(e);
-            return null;
-        }
+    async updateStakesOfOperatorSubsetForAllQuorums(
+        operators: string[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'updateOperators',
+            [operators]
+        );
     }
 
-    async deregisterOperator(quorumNumbers: number[]): Promise<TransactionReceipt | null> {
-        this.logger.info("Deregistering operator with the AVS's registry coordinator");
-
-        try {
-            const receipt = await chainIoUtils.sendContractCall(
-				this.registryCoordinator, 
-				"deregisterOperator",
-				[chainIoUtils.numsToBytes(quorumNumbers)],
-				this.pkWallet, 
-				this.ethHttpClient
-			);
-            this.logger.info("Successfully deregistered operator with the AVS's registry coordinator", {
-                "txHash": receipt.transactionHash,
-            });
-            return receipt;
-        } catch (e) {
-            this.logger.error(e);
-            return null;
-        }
+    async updateSocket(socket: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'updateSocket',
+            [socket]
+        );
     }
 
-    async updateSocket(socket: string): Promise<TransactionReceipt | null> {
-        this.logger.info("Updating socket", {
-            "socket": socket,
-        });
+    async setRewardsInitiator(rewardsInitiatorAddr: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.serviceManager,
+            'setRewardsInitiator',
+            [rewardsInitiatorAddr]
+        );
+    }
 
-        try {
-            const receipt = await chainIoUtils.sendContractCall(
-				this.registryCoordinator,
-				"updateSocket",
-				[socket], 
-				this.pkWallet,
-				this.ethHttpClient
-			);
-            this.logger.info("Successfully updated socket", {
-                "txHash": receipt.transactionHash,
-            });
-            return receipt;
-        } catch (e) {
-            this.logger.error(e);
-            return null;
-        }
+    async setSlashableStakeLookahead(
+        quorumNumber: number,
+        lookAheadPeriod: number
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.stakeRegistry,
+            'setSlashableStakeLookahead',
+            [quorumNumber, lookAheadPeriod]
+        );
+    }
+
+    async setMinimumStakeForQuorum(
+        quorumNumber: number,
+        minimumStake: number
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.stakeRegistry,
+            'setMinimumStakeForQuorum',
+            [quorumNumber, minimumStake]
+        );
+    }
+
+    async createTotalDelegatedStakeQuorum(
+        operatorSetParams: OperatorSetParams,
+        minimumStakeRequired: Uint96,
+        strategyParams: StrategyParams[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'createTotalDelegatedStakeQuorum',
+            [operatorSetParams, minimumStakeRequired, strategyParams]
+        );
+    }
+
+    async createSlashableStakeQuorum(
+        operatorSetParams: OperatorSetParams,
+        minimumStakeRequired: Uint96,
+        strategyParams: StrategyParams[],
+        lookAheadPeriod: Uint32
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'createSlashableStakeQuorum',
+            [operatorSetParams, minimumStakeRequired, strategyParams, lookAheadPeriod]
+        );
+    }
+
+    async ejectOperator(
+        operatorAddress: string,
+        quorumNumbers: QuorumNum[]
+    ): Promise<TransactionReceipt> {
+        const quorumBytes = chainIoUtils.numsToBytes(quorumNumbers.map(Number));
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'ejectOperator',
+            [operatorAddress, quorumBytes]
+        );
+    }
+
+    async setOperatorSetParams(
+        quorumNumber: number,
+        operatorSetParams: OperatorSetParams
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'setOperatorSetParams',
+            [quorumNumber, operatorSetParams]
+        );
+    }
+
+    async setChurnApprover(churnApproverAddress: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'setChurnApprover',
+            [churnApproverAddress]
+        );
+    }
+
+    async setEjector(ejectorAddress: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'setEjector',
+            [ejectorAddress]
+        );
+    }
+
+    async modifyStrategyParams(
+        quorumNumber: number,
+        strategyIndices: number[],
+        multipliers: number[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.stakeRegistry,
+            'modifyStrategyParams',
+            [quorumNumber, strategyIndices, multipliers]
+        );
+    }
+
+    async setAvs(avsAddress: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'setAVS',
+            [avsAddress]
+        );
+    }
+
+    async setEjectionCooldown(ejectionCooldown: number): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.registryCoordinator,
+            'setEjectionCooldown',
+            [ejectionCooldown]
+        );
+    }
+
+    async addStrategies(
+        quorumNumber: number,
+        strategyParams: StrategyParams[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.stakeRegistry,
+            'addStrategies',
+            [quorumNumber, strategyParams]
+        );
+    }
+
+    async updateAvsMetadataUri(metadataUri: string): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.serviceManager,
+            'updateAVSMetadataURI',
+            [metadataUri]
+        );
+    }
+
+    async removeStrategies(
+        quorumNumber: number,
+        indicesToRemove: number[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.stakeRegistry,
+            'removeStrategies',
+            [quorumNumber, indicesToRemove]
+        );
+    }
+
+    async createAvsRewardsSubmission(
+        rewardsSubmission: RewardsSubmission[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.serviceManager,
+            'createAVSRewardsSubmission',
+            [rewardsSubmission]
+        );
+    }
+
+    async createOperatorDirectedAvsRewardsSubmission(
+        operatorDirectedRewardsSubmissions: OperatorDirectedRewardsSubmissions[]
+    ): Promise<TransactionReceipt> {
+        return await this.sendTransaction(
+            this.serviceManager,
+            'createOperatorDirectedAVSRewardsSubmission',
+            [operatorDirectedRewardsSubmissions]
+        );
     }
 }
