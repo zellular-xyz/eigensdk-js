@@ -1,20 +1,19 @@
 import { ethers, AbiCoder } from 'ethers';
 import { TransactionReceipt, Web3 } from 'web3';
 import { AbiItem } from 'web3-utils';
-import { LocalAccount, OperatorId } from '../types/general.js';
+import { LocalAccount, OperatorId, Uint256 } from '../types/general.js';
 import { G1Point, G2Point, KeyPair } from '../crypto/bls/attestation.js'
 import * as ABIs from '../contracts/ABIs.js'
 import pino from 'pino';
+import { abiEncodeData, jsonEncode } from '../utils/helpers.js';
 
 const logger = pino({
-    level: 'info', // Set log level here
+    level: process.env.LOG_LEVEL || 'info', // Set log level here
     // prettyPrint: { colorize: true }
     transport: {
         target: 'pino-pretty'
     },
 });
-
-const defaultAbiCoder = new ethers.AbiCoder();
 
 export function min(...args): bigint {
     if (args.length === 0) 
@@ -44,46 +43,91 @@ export function bitmapToQuorumIds(bitmap: bigint): number[] {
     return quorumIds;
 }
 
-export async function sendContractCall(
+export type ContractCallParams = {
     contract: any,
     method: string,
     params: any[],
+    // if abi passed, error message can be decoded
+    abi?: AbiItem[],
     pkWallet: LocalAccount,
-    ethHttpClient: Web3,
-    gasLimit = 10_000_000,
-    skipEstimation = true
-): Promise<TransactionReceipt> {
-    const web3 = ethHttpClient;
-
-    const contractMethod = contract.methods[method](...params)
-    const gasPrice = await web3.eth.getGasPrice();
-
-    let gasEstimation = gasLimit;
-    if (!skipEstimation) {
-        gasEstimation = await contractMethod.estimateGas({ from: pkWallet.address });
-    }
-
-
-    const txParams = {
-        data: contractMethod.encodeABI(),
-        from: pkWallet.address,
-        to: contract.options.address,
-        gasPrice: gasPrice,
-        gas: gasEstimation
-    };
-
-    const signedTx = await web3.eth.accounts.signTransaction(
-        txParams,
-        pkWallet.privateKey
-    );
-
-    // logger.info({
-    // 	contractAddress: contract.options.address,
-    // 	method,
-    // }, `Sending contract call transaction.`)
-
-    return await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+    web3: Web3,
+    gasLimit?: number,
+    skipEstimation?: boolean
 }
+
+export async function sendContractCall(_params: ContractCallParams): Promise<TransactionReceipt> {
+    const {
+        contract,
+        method,
+        params,
+        abi,
+        pkWallet,
+        web3,
+        gasLimit = 10_000_000,
+        skipEstimation = true
+    } = _params;
+
+    logger.debug(`eigensdk.chainio.utils.sendContractCall ` + jsonEncode({
+        contract: contract.options.address,
+        method,
+        params
+    }))
+
+    try {
+        const contractMethod = contract.methods[method](...params)
+        const gasPrice = await web3.eth.getGasPrice();
+        let gasEstimation = gasLimit;
+        if (!skipEstimation) {
+            gasEstimation = await contractMethod.estimateGas({ from: pkWallet.address });
+        }
+
+        const txParams = {
+            data: contractMethod.encodeABI(),
+            from: pkWallet.address,
+            to: contract.options.address,
+            gasPrice: gasPrice,
+            gas: gasEstimation
+        };
+
+        const signedTx = await web3.eth.accounts.signTransaction(
+            txParams,
+            pkWallet.privateKey
+        );
+
+        // logger.info({
+        // 	contractAddress: contract.options.address,
+        // 	method,
+        // }, `Sending contract call transaction.`)
+
+        const txReceipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        logger.debug({tx: txReceipt.transactionHash}, `eigensdk.chainio.utils.sendContractCall:${method}`)
+        return txReceipt;
+    }
+    catch (e: any) {
+        if(abi && e.signature) {
+            const { signature } = e;
+            const customErrMsg = decodeCustomError(abi, web3, signature);
+            e.customMsg = customErrMsg || "Unknown error."
+        }
+        logger.debug(e, `ERROR: eigensdk.chainio.utils.sendContractCall:${method}`)
+        throw e;
+    }
+    
+}
+
+function decodeCustomError(abi: AbiItem[], web3: Web3, signature: string): string | null {
+    const errorABI:any = abi
+        .filter(item => item.type === 'error')
+        .find(
+            (item: any) =>  web3.utils.keccak256(`${item.name}(${item.inputs.map((i: any) => i.type).join(',')})`).slice(0, 10) === signature
+        );
+
+    if (errorABI) {
+      return errorABI.name
+    } else {
+      return null
+    }
+  }
 
 export class Transactor {
     private pkWallet: LocalAccount;
@@ -104,15 +148,15 @@ export class Transactor {
     }
 
     async send(contract: any, method: string, params: any[]): Promise<TransactionReceipt> {
-        return sendContractCall(
+        return await sendContractCall({
             contract,
             method,
             params,
-            this.pkWallet,
-            this.ethHttpClient,
-            this.gasLimit,
-            this.skipEstimation
-        );
+            pkWallet: this.pkWallet,
+            web3: this.ethHttpClient,
+            gasLimit: this.gasLimit,
+            skipEstimation: this.skipEstimation
+        });
     }
 }
 
@@ -137,8 +181,13 @@ export function abiEncodeNormalRegistrationParams(
         ]
     ];
 
-    const encoded = defaultAbiCoder.encode([abi_type], [registration_struct]);
-    return encoded.slice(64); // Remove first 32 bytes (0x + 32-byte offset)
+
+    const encoded = abiEncodeData([abi_type], [registration_struct]);
+    
+    // The encoder is prepending 32 bytes to the data as if it was used in a dynamic function parameter.
+	// This is not used when decoding the bytes directly, so we need to remove it.
+
+    return "0x" + encoded.slice(2 + 64); // Remove first 32 bytes (0x + 32-byte offset)
 }
 
 // ABI encode operator AVS registration params
@@ -156,8 +205,8 @@ export function abiEncodeOperatorAvsRegistrationParams(
         [pubkey_reg_params[0], pubkey_reg_params[1], pubkey_reg_params[2]]
     ];
 
-    const encoded = defaultAbiCoder.encode([type_str], [data]);
-    return encoded.slice(64); // Remove first 32 bytes (0x + 32-byte offset)
+    const encoded = abiEncodeData([type_str], [data]);
+    return "0x" + encoded.slice(2 + 64); // Remove first 32 bytes (0x + 32-byte offset)
 }
 
 // Remove duplicate strategies
@@ -189,17 +238,17 @@ export type PubkeyRegistrationParams = {
 
 // Get pubkey registration params
 export async function getPubkeyRegistrationParams(
-    ethHttpClient: Web3,
+    web3: Web3,
     registryCoordinatorAddr: string,
     operatorAddress: string,
     blsKeyPair: KeyPair
 ): Promise<PubkeyRegistrationParams> {
-    const registryCoordinator = new ethHttpClient.eth.Contract(
+    const registryCoordinator = new web3.eth.Contract(
         ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
-        this.registryCoordinatorAddr
+        registryCoordinatorAddr
     );
 
-    const g1Hash = await registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddress).call();
+    const g1Hash: [Uint256, Uint256] = await registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddress).call();
     const g1Point: G1Point = new G1Point(
         g1Hash[0],
         g1Hash[1]
@@ -218,15 +267,22 @@ export async function getPubkeyRegistrationParams(
         ] as [bigint, bigint],
         pubkeyG2: [
             [
+                BigInt(blsKeyPair.pubG2.getX().get_b().getStr()),
                 BigInt(blsKeyPair.pubG2.getX().get_a().getStr()),
-                BigInt(blsKeyPair.pubG2.getX().get_b().getStr())
             ],
             [
+                BigInt(blsKeyPair.pubG2.getY().get_b().getStr()),
                 BigInt(blsKeyPair.pubG2.getY().get_a().getStr()),
-                BigInt(blsKeyPair.pubG2.getY().get_b().getStr())
             ]
         ] as [[bigint, bigint], [bigint, bigint]]
     };
 
     return pubkey_reg_params;
+}
+
+export function loadLocalAccount(ecdsaPrivateKey: string): LocalAccount {
+    return {
+        address: new ethers.Wallet(ecdsaPrivateKey).address,
+        privateKey: ecdsaPrivateKey.replace("0x", ""),
+    };
 }

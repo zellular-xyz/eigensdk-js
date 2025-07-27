@@ -2,26 +2,27 @@
 	"name": "eigensdk",
 	"version": "0.0.1",
 	"description": "Js SDK for building AVSs on Eigenlayer",
-	"main": "src/index.ts",
-	"exports": {
-		"./package.json": "./package.json",
-		".": {
-			"import": "./src/index.js",
-			"default": "./src/index.js"
-		}
-	},
-	"types": "dist/index.ts",
+    "main": "./src/index.ts",
+	"types": "src/index.ts",
 	"files": [
-		"src"
+		"src/**/*"
 	],
+	"exports": {
+		".": "./src/index.ts",
+        "./chainio/*": "./src/chainio/*.ts",
+        "./crypto/*": "./src/crypto/*.ts",
+        "./contracts/*": "./src/contracts/*.ts",
+        "./contracts/*.json": "./src/contracts/*.json",
+        "./types/*": "./src/types/*.ts",
+        "./utils/*": "./src/utils/*.ts",
+		"./package.json": "./package.json"
+	},
 	"scripts": {
-		"build": "tsup",
 		"format": "dprint fmt",
 		"lint": "run-p lint:*",
 		"lint:format": "dprint check",
 		"lint:types": "tsc",
 		"lint:js": "eslint .",
-		"prepublishOnly": "pnpm build",
 		"test": "vitest"
 	},
 	"dependencies": {
@@ -48,19 +49,5 @@
 		"vitest": "0.34.1"
 	},
 	"sideEffects": false,
-	"tsup": {
-		"entry": [
-			"src/index.ts"
-		],
-		"format": [
-			"esm",
-			"cjs"
-		],
-		"dts": {
-			"resolve": true
-		},
-		"splitting": true,
-		"clean": true
-	},
 	"packageManager": "pnpm@8.15.8"
 }

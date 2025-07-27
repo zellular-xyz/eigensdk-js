@@ -1,8 +1,11 @@
 import { Web3 } from 'web3';
 import { clients, clientsArray, config } from '../builder.js';
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeAll, } from 'vitest';
 import { G1Point, KeyPair } from '../../crypto/bls/attestation.js';
-import { Operator, OperatorSetParams, RewardsSubmission, OperatorDirectedRewardsSubmission, StrategyParams } from '../../types/general.js';
+import { 
+    Operator, OperatorSetParams, RewardsSubmission, 
+    OperatorDirectedRewardsSubmission, StrategyParams 
+} from '../../types/general.js';
 import pino from 'pino';
 
 const logger = pino({
@@ -16,6 +19,10 @@ const logger = pino({
 const quorumNumbers = [0n];
 
 describe('AvsRegistryWriter', () => {
+    beforeAll(async () => {
+        console.log("before all")
+    })
+
     test('registerAsOperatorForOperatorSets', async () => {
         for (let i = 0; i < 3; i++) {
             // @ts-ignore

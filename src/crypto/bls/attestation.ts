@@ -83,10 +83,14 @@ export class G2Point extends mcl.G2 {
 	}
 
 	static fromStr(val: string): G2Point {
-		return new G2Point(
-			// @ts-ignore
-			...val.split(" ").slice(-4).map(BigInt)
-		)
+		// return new G2Point(
+		// 	// @ts-ignore
+		// 	...val.split(" ").slice(-4).map(BigInt)
+		// )
+
+        let res = new G2Point(0n, 0n, 0n, 0n);
+        res.setStr(val);
+        return res;
 	}
 }
 
@@ -107,7 +111,7 @@ export class Signature extends G1Point {
 	toJson(): Object {
 		return {
 			x: this.getX().getStr(),
-			y: this.getX().getStr()
+			y: this.getY().getStr()
 		}
 	}
 
@@ -196,6 +200,9 @@ export class KeyPair {
 		if (!keystoreJson.address) 
 			keystoreJson.address = "0x0000000000000000000000000000000000000000"
 
+		if (!keystoreJson.version) 
+			keystoreJson.version = 3
+        
 		let keystoreAccount = await Web3Eth.accounts.decrypt(keystoreJson, password)
 		return KeyPair.fromString(keystoreAccount.privateKey, 16)
 	}

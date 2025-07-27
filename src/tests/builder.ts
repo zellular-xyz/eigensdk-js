@@ -36,17 +36,17 @@ export type TestConfigs = {
 const config: TestConfigs = yaml.load(fs.readFileSync(configPath, 'utf8')) as TestConfigs;
 
 // Initialize BuildAllConfig
-const cfg = new BuildAllConfig(
-    config.eth_rpc_url,
-    config.avs_registry_coordinator_address,
-    config.operator_state_retriever_address,
-    config.rewards_coordinator_address,
-    config.permission_controller_address,
-    config.service_manager_address,
-    config.allocation_manager_address,
-    config.delegation_manager_address,
-    'incredible-squaring'
-);
+const cfg = new BuildAllConfig({
+    avsName: 'incredible-squaring',
+    ethHttpUrl: config.eth_rpc_url,
+    registryCoordinatorAddr: config.avs_registry_coordinator_address,
+    operatorStateRetrieverAddr: config.operator_state_retriever_address,
+    rewardsCoordinatorAddr: config.rewards_coordinator_address,
+    permissionControllerAddr: config.permission_controller_address,
+    serviceManagerAddr: config.service_manager_address,
+    allocationManagerAddr: config.allocation_manager_address,
+    delegationManagerAddr: config.delegation_manager_address
+});
 
 // Build array of Clients instances
 const clientsArray: Clients[] = [];

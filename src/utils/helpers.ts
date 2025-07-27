@@ -1,9 +1,11 @@
 import Web3 from 'web3'
+import { ethers, ParamType } from 'ethers';
 import { AbiItem } from 'web3-utils';
 import { G1Point, G2Point } from '../crypto/bls/attestation';
 import * as ethUtil from "ethereumjs-util"
 
 const web3 = new Web3()
+const defaultAbiCoder = new ethers.AbiCoder();
 
 export function bigIntCmp(a: any, b: any){
 	if (a < b) return -1;
@@ -15,7 +17,7 @@ export function typedEntries<T0 extends any, T1>(obj: object): [T0, T1][] {
 	return Object.entries(obj).map(([key, val]) => ([key as T0, val as T1]))
 }
 
-export function decodeTxReceiptLogs(receipt: any, contractAbi: AbiItem[]) {
+export function decodeTxReceiptLogs(receipt: any, contractAbi: AbiItem[]): any[] {
     if (!receipt || !receipt.logs) {
         console.error('No logs found in the receipt');
         return;
@@ -28,8 +30,7 @@ export function decodeTxReceiptLogs(receipt: any, contractAbi: AbiItem[]) {
             // Ensure it's an event type
             if (abiItem.type !== 'event') continue;
 
-            const eventAbi:AbiItem = abiItem as AbiItem;
-			// @ts-ignore
+            const eventAbi: any = abiItem;
             const eventSignature = web3.eth.abi.encodeEventSignature(eventAbi);
 
             // Check if the log matches the event signature
@@ -45,6 +46,25 @@ export function decodeTxReceiptLogs(receipt: any, contractAbi: AbiItem[]) {
         }
     }
 	return results
+}
+
+export function decodeTxLog(log: any, eventAbi: any) {
+    const eventSignature = web3.eth.abi.encodeEventSignature(eventAbi);
+    if (log.topics[0] === eventSignature) {
+        // Decode the log
+        return web3.eth.abi.decodeLog(
+            // @ts-ignore
+            eventAbi.inputs!,
+            log.data,
+            log.topics.slice(1)
+        );
+    }
+    else
+        return null;
+}
+
+export function abiEncodeData(types: ReadonlyArray<string | ParamType>, values: ReadonlyArray<any>): string {
+    return defaultAbiCoder.encode(types, values);
 }
 
 export type GetEventsOptions = {
@@ -104,4 +124,24 @@ export function signRawData(data: string, privateKey: string): string {
 		Buffer.from(removeHexPrefix(privateKey), 'hex')
 	);
     return ethUtil.toCompactSig(v, r, s);
+}
+
+// encode objects containing BigInt
+export function jsonEncode(obj: any, replacer?: any , space?: string | number) {
+    return JSON.stringify(obj, (key, value) => {
+        if (typeof value === 'bigint') {
+            return value.toString() + "n"; // Append 'n' to mark as BigInt
+        }
+        return value;
+    }, space);
+}
+
+// decode json objects containing BigInt
+export function jsonDecode(jsonStr: string) {
+    return JSON.parse(jsonStr, (key, value) => {
+        if (typeof value === 'string' && /^-?\d+n$/.test(value)) {
+            return BigInt(value.slice(0, -1)); // Remove 'n' and convert to BigInt
+        }
+        return value;
+    });
 }

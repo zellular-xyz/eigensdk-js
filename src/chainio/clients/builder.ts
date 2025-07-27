@@ -9,39 +9,39 @@ import {AvsRegistryWriter} from './avsregistry/writer';
 import {ELReader} from './elcontracts/reader';
 import {ELWriter} from './elcontracts/writer';
 import { LocalAccount } from '../../types/general';
+import { loadLocalAccount } from '../utils.js';
 
 const logger = pino({ 
-	level: 'info',
+	level: process.env.LOG_LEVEL || 'info',
 	transport: {
 		target: 'pino-pretty'
 	}
 });
 
+export type BuildParams = {
+    avsName: string,
+    ethHttpUrl: string,
+    registryCoordinatorAddr: string,
+    operatorStateRetrieverAddr: string,
+    rewardsCoordinatorAddr: string,
+    permissionControllerAddr: string,
+    serviceManagerAddr: string,
+    allocationManagerAddr: string,
+    delegationManagerAddr: string,
+    promMetricsIpPortAddress?: string
+}
+
 export class BuildAllConfig {
 
-    constructor(
-        public readonly ethHttpUrl: string,
-        public readonly registryCoordinatorAddr: string,
-        public readonly operatorStateRetrieverAddr: string,
-        public readonly rewardsCoordinatorAddr: string,
-        public readonly permissionControllerAddr: string,
-        public readonly serviceManagerAddr: string,
-        public readonly allocationManagerAddr: string,
-        public readonly delegationManagerAddr: string,
-        public readonly avsName: string,
-        public readonly promMetricsIpPortAddress?: string
-    ) {}
+    constructor(public readonly buildParams: BuildParams) {}
 
     async buildElClients(ecdsaPrivateKey: string): Promise<[ELReader, ELWriter]> {
-        const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.ethHttpUrl));
-        const pkWallet: LocalAccount = {
-            address: new ethers.Wallet(ecdsaPrivateKey).address,
-            privateKey: ecdsaPrivateKey.replace("0x", ""),
-        };
+        const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.buildParams.ethHttpUrl));
+        const pkWallet: LocalAccount = loadLocalAccount(ecdsaPrivateKey);
 
         const registryCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr)
         );
         logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
@@ -68,19 +68,19 @@ export class BuildAllConfig {
 
         const serviceManager = new ethHttpClient.eth.Contract(
             ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr)
         );
         logger.info(`service_manager_instance: ${serviceManager.options.address}`);
 
         const allocationManager = new ethHttpClient.eth.Contract(
             ABIs.ALLOCATION_MANAGER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.allocationManagerAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.allocationManagerAddr)
         );
         logger.info(`allocation_manager_instance: ${allocationManager.options.address}`);
 
         const permissionController = new ethHttpClient.eth.Contract(
             ABIs.PERMISSION_CONTROLLER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.permissionControllerAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.permissionControllerAddr)
         );
         logger.info(`permission_controller_instance: ${permissionController.options.address}`);
 
@@ -93,7 +93,7 @@ export class BuildAllConfig {
 
         const rewardsCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REWARDS_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.rewardsCoordinatorAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.rewardsCoordinatorAddr)
         );
         logger.info(`rewards_coordinator_instance: ${rewardsCoordinator.options.address}`);
 
@@ -133,21 +133,18 @@ export class BuildAllConfig {
         ecdsaPrivateKey: string,
         elReader: ELReader
     ): Promise<[AvsRegistryReader, AvsRegistryWriter]> {
-        const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.ethHttpUrl));
-        const pkWallet: LocalAccount = {
-            address: new ethers.Wallet(ecdsaPrivateKey).address,
-            privateKey: ecdsaPrivateKey.replace("0x", ""),
-        };
+        const ethHttpClient = new Web3(new Web3.providers.HttpProvider(this.buildParams.ethHttpUrl));
+        const pkWallet: LocalAccount = loadLocalAccount(ecdsaPrivateKey);
 
         const registryCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr)
         );
         logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
         const operatorStateRetriever = new ethHttpClient.eth.Contract(
             ABIs.OPERATOR_STATE_RETRIEVER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.operatorStateRetrieverAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.operatorStateRetrieverAddr)
         );
         logger.info(`operator_state_retriever_instance: ${operatorStateRetriever.options.address}`);
 
@@ -160,7 +157,7 @@ export class BuildAllConfig {
 
         const serviceManager = new ethHttpClient.eth.Contract(
             ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr)
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr)
         );
         logger.info(`service_manager_instance: ${serviceManager.options.address}`);
 
@@ -173,7 +170,7 @@ export class BuildAllConfig {
 
         const avsRegistryReader = new AvsRegistryReader(
             registryCoordinator,
-            ethHttpClient.utils.toChecksumAddress(this.registryCoordinatorAddr),
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr),
             blsApkRegistry,
             blsApkRegistryAddr,
             operatorStateRetriever,
@@ -187,7 +184,7 @@ export class BuildAllConfig {
             registryCoordinator,
             operatorStateRetriever,
             serviceManager,
-            ethHttpClient.utils.toChecksumAddress(this.serviceManagerAddr),
+            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr),
             stakeRegistry,
             blsApkRegistry,
             elReader,
@@ -213,13 +210,8 @@ export class Clients {
 }
 
 export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string, logger?: Logger): Promise<Clients> {
-    const ethHttpClient = new Web3(new Web3.providers.HttpProvider(config.ethHttpUrl));
-    console.log({config, ecdsaPrivateKey})
-	const wallet = new ethers.Wallet(ecdsaPrivateKey);
-    const pkWallet:LocalAccount = {
-		address: wallet.address,
-		privateKey: ecdsaPrivateKey.replace("0x", "")
-	}
+    const ethHttpClient = new Web3(new Web3.providers.HttpProvider(config.buildParams.ethHttpUrl));
+    const pkWallet:LocalAccount = loadLocalAccount(ecdsaPrivateKey)
 
     const [elReader, elWriter] = await config.buildElClients(ecdsaPrivateKey);
 

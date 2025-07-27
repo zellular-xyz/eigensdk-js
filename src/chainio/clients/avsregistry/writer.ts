@@ -11,7 +11,10 @@ import { LocalAccount, OperatorDirectedRewardsSubmissions, OperatorSetParams, Qu
 import { signRawData } from "../../../utils/helpers";
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000;
-const logger = pino({ name: "AvsRegWriter" })
+const logger = pino({ 
+    level: process.env.LOG_LEVEL || "info",
+    name: "AvsRegWriter" 
+})
 
 
 export class AvsRegistryWriter {
