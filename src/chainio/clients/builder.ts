@@ -41,7 +41,7 @@ export class BuildAllConfig {
 
         const registryCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr)
+            this.buildParams.registryCoordinatorAddr
         );
         logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
@@ -68,19 +68,19 @@ export class BuildAllConfig {
 
         const serviceManager = new ethHttpClient.eth.Contract(
             ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr)
+            this.buildParams.serviceManagerAddr
         );
         logger.info(`service_manager_instance: ${serviceManager.options.address}`);
 
         const allocationManager = new ethHttpClient.eth.Contract(
             ABIs.ALLOCATION_MANAGER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.allocationManagerAddr)
+            this.buildParams.allocationManagerAddr
         );
         logger.info(`allocation_manager_instance: ${allocationManager.options.address}`);
 
         const permissionController = new ethHttpClient.eth.Contract(
             ABIs.PERMISSION_CONTROLLER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.permissionControllerAddr)
+            this.buildParams.permissionControllerAddr
         );
         logger.info(`permission_controller_instance: ${permissionController.options.address}`);
 
@@ -93,7 +93,7 @@ export class BuildAllConfig {
 
         const rewardsCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REWARDS_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.rewardsCoordinatorAddr)
+            this.buildParams.rewardsCoordinatorAddr
         );
         logger.info(`rewards_coordinator_instance: ${rewardsCoordinator.options.address}`);
 
@@ -138,13 +138,13 @@ export class BuildAllConfig {
 
         const registryCoordinator = new ethHttpClient.eth.Contract(
             ABIs.REGISTRY_COORDINATOR_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr)
+            this.buildParams.registryCoordinatorAddr
         );
         logger.info(`registry_coordinator_instance: ${registryCoordinator.options.address}`);
 
         const operatorStateRetriever = new ethHttpClient.eth.Contract(
             ABIs.OPERATOR_STATE_RETRIEVER_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.operatorStateRetrieverAddr)
+            this.buildParams.operatorStateRetrieverAddr
         );
         logger.info(`operator_state_retriever_instance: ${operatorStateRetriever.options.address}`);
 
@@ -157,7 +157,7 @@ export class BuildAllConfig {
 
         const serviceManager = new ethHttpClient.eth.Contract(
             ABIs.SERVICE_MANAGER_BASE_ABI as AbiItem[],
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr)
+            this.buildParams.serviceManagerAddr
         );
         logger.info(`service_manager_instance: ${serviceManager.options.address}`);
 
@@ -170,7 +170,7 @@ export class BuildAllConfig {
 
         const avsRegistryReader = new AvsRegistryReader(
             registryCoordinator,
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.registryCoordinatorAddr),
+            this.buildParams.registryCoordinatorAddr,
             blsApkRegistry,
             blsApkRegistryAddr,
             operatorStateRetriever,
@@ -184,7 +184,7 @@ export class BuildAllConfig {
             registryCoordinator,
             operatorStateRetriever,
             serviceManager,
-            ethHttpClient.utils.toChecksumAddress(this.buildParams.serviceManagerAddr),
+            this.buildParams.serviceManagerAddr,
             stakeRegistry,
             blsApkRegistry,
             elReader,

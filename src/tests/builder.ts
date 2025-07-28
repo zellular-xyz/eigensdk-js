@@ -48,13 +48,14 @@ const cfg = new BuildAllConfig({
     delegationManagerAddr: config.delegation_manager_address
 });
 
-// Build array of Clients instances
-const clientsArray: Clients[] = [];
-for (let i = 0; i < 3; i++) {
-    clientsArray.push(await buildAll(cfg, config[`ecdsa_private_key_${i + 1}`]));
+async function buildClients() {
+    // Build array of Clients instances
+    const clientsArray: Clients[] = [];
+    for (let i = 0; i < 3; i++) {
+        clientsArray.push(await buildAll(cfg, config[`ecdsa_private_key_${i + 1}`]));
+    }
+
+    return clientsArray
 }
 
-// Select the first Clients instance
-const clients: Clients = clientsArray[0];
-
-export { clients, clientsArray, config, cfg };
+export { config, buildClients };
