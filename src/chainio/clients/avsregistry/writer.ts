@@ -23,48 +23,19 @@ const logger = pino({
 
 
 export class AvsRegistryWriter {
-    serviceManagerAddr: Address;
-    serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>;
-    registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>;
-    operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>;
-    stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>;
-    blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>;
-    elReader: ELReader;
-    logger: Logger;
-    ethHttpClient: Web3;
-    pkWallet: LocalAccount;
-    transactor: chainIoUtils.Transactor;
 
     constructor(
-        registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
-        operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>,
-        serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>,
-        serviceManagerAddr: Address,
-        stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>,
-        blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>,
-        elReader: ELReader,
-        logger: Logger,
-        ethHttpClient: Web3,
-        pkWallet: LocalAccount,
-    ) {
-        this.registryCoordinator = registryCoordinator;
-        this.operatorStateRetriever = operatorStateRetriever;
-        this.serviceManager = serviceManager;
-        this.serviceManagerAddr = serviceManagerAddr;
-        this.stakeRegistry = stakeRegistry;
-        this.blsApkRegistry = blsApkRegistry;
-        this.elReader = elReader;
-        this.logger = logger;
-
-        this.ethHttpClient = ethHttpClient;
-        this.pkWallet = pkWallet;
-
-        this.transactor = new chainIoUtils.Transactor(pkWallet, ethHttpClient);
-    }
-
-    // async sendTransaction(contract: Contract<any>, method: string, params: any[]): Promise<TransactionReceipt> {
-    //     return this.transactor.send(contract, method, params)
-    // }
+        public readonly registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
+        public readonly operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>,
+        public readonly serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>,
+        public readonly serviceManagerAddr: Address,
+        public readonly stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>,
+        public readonly blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>,
+        public readonly elReader: ELReader,
+        public readonly logger: Logger,
+        public readonly ethHttpClient: Web3,
+        public readonly pkWallet: LocalAccount,
+    ) {}
 
     async updateStakesOfEntireOperatorSetForQuorums(
         operatorsPerQuorum: string[][],

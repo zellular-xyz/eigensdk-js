@@ -26,7 +26,6 @@ interface AdminRequest {
 }
 
 export class ELWriter {
-    transactor: chainIoUtils.Transactor;
 
     constructor(
         private readonly allocationManager: Contract<typeof ABIs.ALLOCATION_MANAGER_ABI>,
@@ -42,18 +41,7 @@ export class ELWriter {
         private readonly pkWallet: LocalAccount,
         private readonly strategyAbi: AbiItem[],
         private readonly erc20Abi: AbiItem[]
-    ) {
-        this.transactor = new chainIoUtils.Transactor(pkWallet, ethHttpClient);
-    }
-
-    async sendTransaction(contract: Contract<any>, method: string, params: any[]): Promise<TransactionReceipt> {
-        this.logger.debug({
-            contract: contract.options.address,
-            method,
-            params,
-        }, "ELWriter.sendTransaction")
-        return await this.transactor.send(contract, method, params)
-    }
+    ) {}
 
     async registerAsOperator(operator: Operator): Promise<TransactionReceipt> {
         if (!this.delegationManager)

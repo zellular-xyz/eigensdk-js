@@ -1,11 +1,7 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { BuildAllConfig, Clients, buildAll } from '../chainio/clients/builder';
 
-// Get the directory where the current file is located
-const currentDir = path.dirname(__filename);
-const configPath = path.join(currentDir, 'config', 'anvil.yaml');
 
 export type TestConfigs = {
     operator_address_1: string,
@@ -30,10 +26,11 @@ export type TestConfigs = {
 
     ecdsa_private_key_store_path: string,
     strategy_addr: string,
+    [key: string]: any,
 }
 
 // Read and parse the YAML configuration file
-const config: TestConfigs = yaml.load(fs.readFileSync(configPath, 'utf8')) as TestConfigs;
+const config: TestConfigs = yaml.load(fs.readFileSync('./config/anvil.yaml', 'utf8')) as TestConfigs;
 
 // Initialize BuildAllConfig
 const cfg = new BuildAllConfig({
