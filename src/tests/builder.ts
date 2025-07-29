@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { BuildAllConfig, Clients, buildAll } from '../chainio/clients/builder';
 
@@ -30,7 +31,7 @@ export type TestConfigs = {
 }
 
 // Read and parse the YAML configuration file
-const config: TestConfigs = yaml.load(fs.readFileSync('./config/anvil.yaml', 'utf8')) as TestConfigs;
+const config: TestConfigs = yaml.load(fs.readFileSync(path.resolve(__dirname, './config/anvil.yaml'), 'utf8')) as TestConfigs;
 
 // Initialize BuildAllConfig
 const cfg = new BuildAllConfig({
