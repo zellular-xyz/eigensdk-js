@@ -44,16 +44,16 @@ export type ClaimCheckParams = {
 
 export class ELReader {
     constructor(
-        private readonly allocationManager: Contract<typeof ABIs.ALLOCATION_MANAGER_ABI>,
-        private readonly avsDirectory: Contract<typeof ABIs.AVS_DIRECTORY_ABI>,
-        private readonly delegationManager: Contract<typeof ABIs.DELEGATION_MANAGER_ABI>,
-        private readonly permissionController: Contract<typeof ABIs.PERMISSION_CONTROLLER_ABI>,
-        private readonly rewardCoordinator: Contract<typeof ABIs.REWARDS_COORDINATOR_ABI>,
-        private readonly strategyManager: Contract<typeof ABIs.STRATEGY_MANAGER_ABI>,
-        private readonly logger: Logger,
-        private readonly web3: Web3,
-        private readonly strategyAbi: AbiItem[],
-        private readonly erc20Abi: AbiItem[]
+        public readonly allocationManager: Contract<typeof ABIs.ALLOCATION_MANAGER_ABI>,
+        public readonly avsDirectory: Contract<typeof ABIs.AVS_DIRECTORY_ABI>,
+        public readonly delegationManager: Contract<typeof ABIs.DELEGATION_MANAGER_ABI>,
+        public readonly permissionController: Contract<typeof ABIs.PERMISSION_CONTROLLER_ABI>,
+        public readonly rewardCoordinator: Contract<typeof ABIs.REWARDS_COORDINATOR_ABI>,
+        public readonly strategyManager: Contract<typeof ABIs.STRATEGY_MANAGER_ABI>,
+        public readonly logger: Logger,
+        public readonly web3: Web3,
+        public readonly strategyAbi: AbiItem[],
+        public readonly erc20Abi: AbiItem[]
     ) { }
 
     async getAllocatableMagnitude(operatorAddr?: string, strategyAddr?: string): Promise<Uint64> {
