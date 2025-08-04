@@ -25,37 +25,17 @@ import { G1Point, G2Point } from '../../../crypto/bls/attestation';
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000n
 
 export class AvsRegistryReader {
-    private logger: Logger;
-    private blsApkRegistryAddr: Address;
-    private blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>;
-    private registryCoordinatorAddr: Address;
-    private registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>;
-    private operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>;
-    private serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>;
-    private stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>;
-    ethHttpClient: Web3;
-
     constructor(
-        registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
-        registryCoordinatorAddr: Address,
-        blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>,
-        blsApkRegistryAddr: Address,
-        operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>,
-        serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>,
-        stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>,
-        logger: Logger,
-        ethHttpClient: Web3,
-    ) {
-        this.logger = logger;
-        this.blsApkRegistryAddr = blsApkRegistryAddr;
-        this.blsApkRegistry = blsApkRegistry;
-        this.registryCoordinatorAddr = registryCoordinatorAddr;
-        this.registryCoordinator = registryCoordinator;
-        this.operatorStateRetriever = operatorStateRetriever;
-        this.serviceManager = serviceManager;
-        this.stakeRegistry = stakeRegistry;
-        this.ethHttpClient = ethHttpClient;
-    }
+        public readonly registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
+        public readonly registryCoordinatorAddr: Address,
+        public readonly blsApkRegistry: Contract<typeof ABIs.BLS_APK_REGISTRY_ABI>,
+        public readonly blsApkRegistryAddr: Address,
+        public readonly operatorStateRetriever: Contract<typeof ABIs.OPERATOR_STATE_RETRIEVER_ABI>,
+        public readonly serviceManager: Contract<typeof ABIs.SERVICE_MANAGER_BASE_ABI>,
+        public readonly stakeRegistry: Contract<typeof ABIs.STAKE_REGISTRY_ABI>,
+        public readonly logger: Logger,
+        public readonly ethHttpClient: Web3,
+    ) {}
 
     async getQuorumCount(): Promise<Uint8> {
         return await this.registryCoordinator.methods.quorumCount().call();
