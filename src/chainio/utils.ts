@@ -1,11 +1,15 @@
 import { ethers, AbiCoder } from 'ethers';
-import { TransactionReceipt, Web3 } from 'web3';
+import { Contract, TransactionReceipt, Web3 } from 'web3';
+import { randomBytes } from "crypto";
 import { AbiItem } from 'web3-utils';
-import { LocalAccount, OperatorId, Uint256 } from '../types/general.js';
-import { G1Point, G2Point, KeyPair } from '../crypto/bls/attestation.js'
+import { BlockNumber, LocalAccount, OperatorId, QuorumNum, Uint256 } from '../types/general.js';
+import { G1Point, G2Point, KeyPair, PrivateKey } from '../crypto/bls/attestation.js'
 import * as ABIs from '../contracts/ABIs.js'
 import pino from 'pino';
-import { abiEncodeData, jsonEncode } from '../utils/helpers.js';
+import { abiEncodeData, jsonEncode, obj2arr } from '../utils/helpers.js';
+import { OperatorKickParam, SignatureWithSaltAndExpiry } from './clients/elcontracts/types.js';
+import { operatorIdFromG1Pubkey } from '../types/operator.js';
+import { RegistrationType } from './clients/elcontracts/writer.js';
 
 const logger = pino({
     level: process.env.LOG_LEVEL || 'info', // Set log level here
@@ -16,27 +20,36 @@ const logger = pino({
 });
 
 export function min(...args): bigint {
-    if (args.length === 0) 
+    if (args.length === 0)
         throw new Error('No arguments provided for min method');
-    if (!args.every(val => typeof val === "bigint")) 
+    if (!args.every(val => typeof val === "bigint"))
         throw new TypeError('min arguments must be BigInt');
     return args.reduce((min, current) => current < min ? current : min);
 }
 
-export function numsToBytes(nums: number[]): Uint8Array {
+export function sortEthAddresses(addresses: string[]) {
+    return addresses.sort((a, b) => {
+        // Convert to lowercase for case-insensitive comparison
+        const addrA = a.toLowerCase();
+        const addrB = b.toLowerCase();
+        return addrA < addrB ? -1 : addrA > addrB ? 1 : 0;
+    });
+}
+
+export function numsToBytes(nums: number[]): string {
     const chars: string[] = nums.map(num => String.fromCharCode(num));
     // const chars: string[] = nums.map(num => String.fromCodePoint(num));
     const joinedString: string = chars.join('');
     const bytes: Uint8Array = new TextEncoder().encode(joinedString);
-    return bytes;
+    return "0x" + Buffer.from(bytes).toString('hex');
 }
 
-export function bitmapToQuorumIds(bitmap: bigint): number[] {
-    const quorumIds: number[] = [];
+export function bitmapToQuorumIds(bitmap: bigint): QuorumNum[] {
+    const quorumIds: QuorumNum[] = [];
     let mask = 1n;
     for (let i = 0; i < 256; i++) {
         if (bitmap & mask) {
-            quorumIds.push(i);
+            quorumIds.push(BigInt(i));
         }
         mask <<= 1n;
     }
@@ -100,34 +113,42 @@ export async function sendContractCall(_params: ContractCallParams): Promise<Tra
         // }, `Sending contract call transaction.`)
 
         const txReceipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        logger.debug({tx: txReceipt.transactionHash}, `eigensdk.chainio.utils.sendContractCall:${method}`)
+        logger.debug({ tx: txReceipt.transactionHash }, `eigensdk.chainio.utils.sendContractCall:${method}`)
         return txReceipt;
     }
     catch (e: any) {
-        if(abi && e.signature) {
+        if (abi && e.signature) {
             const { signature } = e;
             const customErrMsg = decodeCustomError(abi, web3, signature);
             e.customMsg = customErrMsg || "Unknown error."
+            if (customErrMsg) {
+                e.message += ` ${e.signature}(${customErrMsg})`
+            }
         }
-        logger.debug(e, `ERROR: eigensdk.chainio.utils.sendContractCall:${method}`)
+        // logger.debug(e, `ERROR: eigensdk.chainio.utils.sendContractCall:${method}`)
         throw e;
     }
-    
+
 }
 
-function decodeCustomError(abi: AbiItem[], web3: Web3, signature: string): string | null {
-    const errorABI:any = abi
+export function getCustomErrorSignature(abiItem: AbiItem): string {
+    // @ts-ignore
+    return Web3.utils.keccak256(`${abiItem.name}(${abiItem.inputs.map((i: any) => i.type).join(',')})`).slice(0, 10);
+}
+
+export function decodeCustomError(abi: AbiItem[], web3: Web3, signature: string): string | null {
+    const errorABI: any = abi
         .filter(item => item.type === 'error')
         .find(
-            (item: any) =>  web3.utils.keccak256(`${item.name}(${item.inputs.map((i: any) => i.type).join(',')})`).slice(0, 10) === signature
+            (item: any) => getCustomErrorSignature(item) === signature
         );
 
     if (errorABI) {
-      return errorABI.name
+        return errorABI.name
     } else {
-      return null
+        return null
     }
-  }
+}
 
 export class Transactor {
     private pkWallet: LocalAccount;
@@ -162,7 +183,6 @@ export class Transactor {
 
 // ABI encode normal registration params
 export function abiEncodeNormalRegistrationParams(
-    registration_type: number,
     socket: string,
     pubkey_reg_params: {
         pubkeyRegistrationSignature: [bigint, bigint];
@@ -172,7 +192,7 @@ export function abiEncodeNormalRegistrationParams(
 ): string {
     const abi_type = '(uint8,string,((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])))';
     const registration_struct = [
-        registration_type,
+        RegistrationType.NORMAL,
         socket,
         [
             pubkey_reg_params.pubkeyRegistrationSignature,
@@ -183,9 +203,106 @@ export function abiEncodeNormalRegistrationParams(
 
 
     const encoded = abiEncodeData([abi_type], [registration_struct]);
-    
+
     // The encoder is prepending 32 bytes to the data as if it was used in a dynamic function parameter.
-	// This is not used when decoding the bytes directly, so we need to remove it.
+    // This is not used when decoding the bytes directly, so we need to remove it.
+
+    return "0x" + encoded.slice(2 + 64); // Remove first 32 bytes (0x + 32-byte offset)
+}
+
+export async function signChurnRegistration(
+    provider: Web3,
+    registryCoordinator: Contract<typeof ABIs.REGISTRY_COORDINATOR_ABI>,
+    operatorAddress: string,
+    churnApprovalPrivateKey: string,
+    pubKeyG1: G1Point, // depends on your BLS representation, placeholder here
+    operatorKickParams: OperatorKickParam[]
+): Promise<SignatureWithSaltAndExpiry> {
+    // Get current block
+    const curBlockNum: BlockNumber = await provider.eth.getBlockNumber();
+    const curBlock = await provider.eth.getBlock(curBlockNum);
+    if (!curBlock?.timestamp) {
+        throw new Error("Failed to fetch current block");
+    }
+
+    // Expiry = now + 1 hour
+    const sigValidForSeconds = 60n * 60n;
+    const expiry: bigint = curBlock.timestamp + sigValidForSeconds;
+
+    // Generate random salt (32 bytes)
+    const salt = randomBytes(32);
+
+    // operatorId derived from pubKeyG1
+    const operatorId = operatorIdFromG1Pubkey(pubKeyG1);
+
+    // Transform operatorKickParams
+    const kickParams = operatorKickParams.map(p => ({
+        quorumNumber: p.quorumNumber,
+        operator: p.operator,
+    }));
+
+    // Calculate digest hash (EIP-712 typed hash onchain)
+    const msgToSign: string = await registryCoordinator.methods.calculateOperatorChurnApprovalDigestHash(
+        operatorAddress,
+        operatorId,
+        kickParams,
+        salt,
+        expiry
+    ).call();
+
+    // Sign digest with churnApprovalPrivateKey
+    const wallet = new ethers.Wallet(churnApprovalPrivateKey, null);
+    let signature = await wallet.signingKey.sign(msgToSign);
+
+    const sigBytes = signature.serialized;
+
+    return {
+        signature: sigBytes,
+        salt: "0x" + salt.toString("hex"),
+        expiry
+    };
+}
+
+// ABI encode normal registration params
+export function abiEncodeRegistrationWithChurnParams(
+    socket: string,
+    pubkey_reg_params: {
+        pubkeyRegistrationSignature: [bigint, bigint];
+        pubkeyG1: [bigint, bigint];
+        pubkeyG2: [[bigint, bigint], [bigint, bigint]];
+    },
+    operatorKickParam: OperatorKickParam[],
+    signatureWithSaltAndExpiry: SignatureWithSaltAndExpiry
+): string {
+    const abi_type = [
+        '(uint8',
+        'string',
+        '((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2]))',
+        '(uint8,address)[]',
+        '(bytes,bytes32,uint256))'
+    ].join(",");
+
+    const registration_struct = [
+        RegistrationType.TRUSTED,
+        socket,
+        [
+            pubkey_reg_params.pubkeyRegistrationSignature,
+            pubkey_reg_params.pubkeyG1,
+            pubkey_reg_params.pubkeyG2
+        ],
+        operatorKickParam.map(({quorumNumber, operator}) => [quorumNumber, operator]),
+        [
+            signatureWithSaltAndExpiry.signature,
+            signatureWithSaltAndExpiry.salt,
+            signatureWithSaltAndExpiry.expiry,
+        ]
+    ];
+
+
+    const encoded = abiEncodeData([abi_type], [registration_struct]);
+
+    // The encoder is prepending 32 bytes to the data as if it was used in a dynamic function parameter.
+    // This is not used when decoding the bytes directly, so we need to remove it.
 
     return "0x" + encoded.slice(2 + 64); // Remove first 32 bytes (0x + 32-byte offset)
 }
@@ -248,7 +365,9 @@ export async function getPubkeyRegistrationParams(
         registryCoordinatorAddr
     );
 
-    const g1Hash: [Uint256, Uint256] = await registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddress).call();
+    const g1Hash: [Uint256, Uint256] = obj2arr(
+        await registryCoordinator.methods.pubkeyRegistrationMessageHash(operatorAddress).call()
+    );
     const g1Point: G1Point = new G1Point(
         g1Hash[0],
         g1Hash[1]
@@ -285,4 +404,8 @@ export function loadLocalAccount(ecdsaPrivateKey: string): LocalAccount {
         address: new ethers.Wallet(ecdsaPrivateKey).address,
         privateKey: ecdsaPrivateKey.replace("0x", ""),
     };
+}
+
+export function arrayify(hexStr: string): Uint8Array {
+    return Uint8Array.from(Buffer.from(hexStr.replace(/^0x/, ""), "hex"));
 }

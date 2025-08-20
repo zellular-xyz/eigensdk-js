@@ -14,9 +14,8 @@ services:
     volumes:
       - .:/app
     environment:
-      - PYTHONPATH=/app
       - ETH_HTTP_URL=http://anvil:8545
     depends_on:
       anvil:
         condition: service_healthy
-    command: npm run vitest
+    command: npm run test

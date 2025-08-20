@@ -11,7 +11,7 @@ import * as ABIs from '../../../contracts/ABIs'
 import { 
     LocalAccount, OperatorDirectedRewardsSubmission, 
     OperatorSetParams, QuorumNum, RewardsSubmission, 
-    StrategyParams, Uint16, Uint256, Uint32, Uint96 
+    StrategyParams, Uint16, Uint256, Uint32, Uint8, Uint96 
 } from "../../../types/general";
 import { signRawData } from "../../../utils/helpers";
 
@@ -42,10 +42,14 @@ export class AvsRegistryWriter {
         quorumNumbers: QuorumNum[]
     ): Promise<TransactionReceipt> {
         const quorumBytes = chainIoUtils.numsToBytes(quorumNumbers.map(Number));
+        let sortedOperatorsPerQuorum: string[][] = []
+        for(let operators of operatorsPerQuorum) {
+            sortedOperatorsPerQuorum.push(chainIoUtils.sortEthAddresses([...operators]))
+        }
         return await sendContractCall({
             contract: this.registryCoordinator,
             method: 'updateOperatorsForQuorum',
-            params: [operatorsPerQuorum, quorumBytes],
+            params: [sortedOperatorsPerQuorum, quorumBytes],
             abi: ABIs.REGISTRY_COORDINATOR_ABI,
             pkWallet: this.pkWallet,
             web3: this.ethHttpClient
@@ -88,8 +92,8 @@ export class AvsRegistryWriter {
     }
 
     async setSlashableStakeLookahead(
-        quorumNumber: number,
-        lookAheadPeriod: number
+        quorumNumber: Uint8,
+        lookAheadPeriod: Uint32
     ): Promise<TransactionReceipt> {
         return await sendContractCall({
             contract: this.stakeRegistry,
@@ -155,14 +159,14 @@ export class AvsRegistryWriter {
             contract: this.registryCoordinator,
             method: 'ejectOperator',
             params: [operatorAddress, quorumBytes],
-            abi: ABIs.REGISTRY_COORDINATOR_ABI,
+            abi: [...ABIs.REGISTRY_COORDINATOR_ABI, ...ABIs.ALLOCATION_MANAGER_ABI],
             pkWallet: this.pkWallet,
             web3: this.ethHttpClient
         });
     }
 
     async setOperatorSetParams(
-        quorumNumber: number,
+        quorumNumber: QuorumNum,
         operatorSetParams: OperatorSetParams
     ): Promise<TransactionReceipt> {
         return await sendContractCall({
@@ -235,7 +239,7 @@ export class AvsRegistryWriter {
     }
 
     async addStrategies(
-        quorumNumber: number,
+        quorumNumber: Uint8,
         strategyParams: StrategyParams[]
     ): Promise<TransactionReceipt> {
         return await sendContractCall({
@@ -260,14 +264,17 @@ export class AvsRegistryWriter {
     }
 
     async removeStrategies(
-        quorumNumber: number,
-        indicesToRemove: number[]
+        quorumNumber: Uint8,
+        indicesToRemove: Uint256[]
     ): Promise<TransactionReceipt> {
         return await sendContractCall({
             contract: this.stakeRegistry,
             method: 'removeStrategies',
             params: [quorumNumber, indicesToRemove],
-            abi: ABIs.STAKE_REGISTRY_ABI,
+            abi: [
+                ...ABIs.STAKE_REGISTRY_ABI,
+                ...ABIs.ALLOCATION_MANAGER_ABI,
+            ],
             pkWallet: this.pkWallet,
             web3: this.ethHttpClient
         });
@@ -293,7 +300,7 @@ export class AvsRegistryWriter {
             contract: this.serviceManager,
             method: 'createOperatorDirectedAVSRewardsSubmission',
             params: [operatorDirectedRewardsSubmission],
-            abi: ABIs.SERVICE_MANAGER_BASE_ABI,
+            abi: Object.values(ABIs).flat(),
             pkWallet: this.pkWallet,
             web3: this.ethHttpClient
         });

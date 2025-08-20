@@ -10,6 +10,7 @@ import {ELReader} from './elcontracts/reader';
 import {ELWriter} from './elcontracts/writer';
 import { LocalAccount } from '../../types/general';
 import { loadLocalAccount } from '../utils.js';
+import { obj2arr } from '../../utils/helpers.js';
 
 const logger = pino({ 
 	level: process.env.LOG_LEVEL || 'info',
@@ -208,7 +209,7 @@ export class Clients {
         public readonly elReader: ELReader,
         public readonly elWriter: ELWriter,
         public readonly ethHttpClient: Web3,
-        public readonly wallet: LocalAccount,
+        public readonly pkWallet: LocalAccount,
         public readonly metrics: any
     ) {}
 }
@@ -217,9 +218,9 @@ export async function buildAll(config: BuildAllConfig, ecdsaPrivateKey: string, 
     const ethHttpClient = new Web3(new Web3.providers.HttpProvider(config.buildParams.ethHttpUrl));
     const pkWallet:LocalAccount = loadLocalAccount(ecdsaPrivateKey)
 
-    const [elReader, elWriter] = await config.buildElClients(ecdsaPrivateKey);
+    const [elReader, elWriter] = await config.buildElClients(ecdsaPrivateKey)
 
-    const [avsRegistryReader, avsRegistryWriter] = await config.buildAvsRegistryClients(ecdsaPrivateKey, elReader);
+    const [avsRegistryReader, avsRegistryWriter] = await config.buildAvsRegistryClients(ecdsaPrivateKey, elReader)
 
     return new Clients(
         avsRegistryReader,

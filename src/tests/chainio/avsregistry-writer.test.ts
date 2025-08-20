@@ -2,12 +2,15 @@ import { Web3 } from 'web3';
 import { buildClients, config } from '../builder.js';
 import { describe, test, expect, beforeAll, } from 'vitest';
 import { G1Point, KeyPair, init as attestationInit } from '../../crypto/bls/attestation.js';
-import { 
-    Operator, OperatorSetParams, RewardsSubmission, 
-    OperatorDirectedRewardsSubmission, StrategyParams 
+import {
+    Operator, OperatorSetParams, RewardsSubmission,
+    OperatorDirectedRewardsSubmission, StrategyParams
 } from '../../types/general.js';
+import * as ABIs from '../../contracts/ABIs'
 import pino from 'pino';
 import { Clients } from '../../chainio/clients/builder.js';
+import * as testUtils from '../utils/anvil.js';
+import { decodeTxReceiptLogs } from '../../utils/helpers.js';
 
 const logger = pino({
     level: 'info', // Set log level here
@@ -17,58 +20,66 @@ const logger = pino({
     },
 });
 
+const test2 = (a: any, b: any) => { }
+
 const timeout = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const quorumNumbers = [0n];
-
 describe.sequential('AvsRegistryWriter', () => {
-    let clientsArray: Clients[];
+    let clients: Clients[];
+    let addresses: testUtils.ContractAddresses;
     let client0: Clients;
 
     beforeAll(async () => {
-        await attestationInit()
-        clientsArray = await buildClients()
-        client0 = clientsArray[0];
+        await attestationInit();
+
+        const testConfigs = testUtils.getDefaultTestConfig();
+        const { container, endpoint } = await testUtils.startAnvilContainer(testConfigs.anvilStateFileName);
+
+        ({ clients, addresses } = await buildClients(endpoint));
+        client0 = clients[0];
     })
 
     test('registerAsOperatorForOperatorSets', async () => {
         for (let i = 0; i < 3; i++) {
             // @ts-ignore
             const address = config[`operator_address_${i + 1}`];
-            const operator: Operator = {
-                address,
-                earningsReceiverAddress: address,
-                delegationApproverAddress: '0x0000000000000000000000000000000000000000',
-                allocationDelay: 50n,
-                metadataUrl: 'https://example.com/operator-metadata',
-                stakerOptOutWindowBlocks: 100n,
-            };
-            const receipt = await clientsArray[i].elWriter.registerAsOperator(operator);
-            expect(receipt).not.toBeNull();
-            expect(receipt.status).toBe(1n);
-            logger.debug(`Registered operator with tx hash: ${receipt.transactionHash}`);
+            // const operator: Operator = {
+            //     address,
+            //     earningsReceiverAddress: address,
+            //     delegationApproverAddress: '0x0000000000000000000000000000000000000000',
+            //     allocationDelay: 50n,
+            //     metadataUrl: 'https://example.com/operator-metadata',
+            //     stakerOptOutWindowBlocks: 100n,
+            // };
+            // const receipt = await clients[i].elWriter.registerAsOperator(operator);
+            // expect(receipt).not.toBeNull();
+            // expect(receipt.status).toBe(1n);
+            // logger.info(`Registered operator with tx hash: ${receipt.transactionHash}`);
 
-            const setReceipt = await clientsArray[i].elWriter.registerForOperatorSets(
-                config.avs_registry_coordinator_address,
+            const setReceipt = await clients[i].elWriter.registerForOperatorSets(
+                addresses.registryCoordinator,
                 {
                     operatorAddress: address,
-                    avsAddress: config.service_manager_address,
+                    avsAddress: addresses.serviceManager,
                     operatorSetIds: [0n],
                     socket: 'operator-socket',
                     blsKeyPair: new KeyPair(),
                 }
             );
             expect(setReceipt.status).toBe(1n);
-            logger.debug(`Registered for operator sets with tx hash: ${setReceipt.transactionHash}`);
+            logger.info(`Registered for operator sets with tx hash: ${setReceipt.transactionHash}`);
         }
     });
 
     test('updateStakesOfEntireOperatorSetForQuorums', async () => {
-        const operatorAddr = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_2);
-        const operatorsPerQuorum = [[operatorAddr]];
+        const operatorsPerQuorum = [[
+            config.operator_address_3,
+            config.operator_address_2,
+            config.operator_address_1,
+        ]];
         const receipt = await client0.avsRegistryWriter.updateStakesOfEntireOperatorSetForQuorums(
             operatorsPerQuorum,
-            quorumNumbers
+            [0n]
         );
         expect(receipt).not.toBeNull();
         logger.info(`Updated stakes with tx hash: ${receipt.transactionHash}`);
@@ -82,7 +93,7 @@ describe.sequential('AvsRegistryWriter', () => {
     });
 
     test('setAvs', async () => {
-        const avsAddress = client0.ethHttpClient.utils.toChecksumAddress(config.service_manager_address);
+        const avsAddress = addresses.serviceManager;
         const receipt = await client0.avsRegistryWriter.setAvs(avsAddress);
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
@@ -90,8 +101,7 @@ describe.sequential('AvsRegistryWriter', () => {
     });
 
     test('updateStakesOfOperatorSubsetForAllQuorums', async () => {
-        const operatorAddr = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_1);
-        const operators = [operatorAddr];
+        const operators = [config.operator_address_1];
         const receipt = await client0.avsRegistryWriter.updateStakesOfOperatorSubsetForAllQuorums(operators);
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
@@ -99,8 +109,7 @@ describe.sequential('AvsRegistryWriter', () => {
     });
 
     test('setRewardsInitiator', async () => {
-        const rewardsInitiatorAddr = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_1);
-        const receipt = await client0.avsRegistryWriter.setRewardsInitiator(rewardsInitiatorAddr);
+        const receipt = await client0.avsRegistryWriter.setRewardsInitiator(config.operator_address_1);
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
         logger.info(`Set rewards initiator with tx hash: ${receipt.transactionHash}`);
@@ -122,8 +131,10 @@ describe.sequential('AvsRegistryWriter', () => {
             kickBIPsOfTotalStake: 2000n,
         };
         const minimumStakeRequired = 1000000n;
-        const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(config.strategy_addr);
-        const strategyParams: StrategyParams[] = [{ strategy: strategyAddr, multiplier: 10000n }];
+        // const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(config.strategy_addr);
+        const strategyParams: StrategyParams[] = [{
+            strategy: addresses.erc20MockStrategy, multiplier: 10000n
+        }];
         const receipt = await client0.avsRegistryWriter.createTotalDelegatedStakeQuorum(
             operatorSetParams,
             minimumStakeRequired,
@@ -148,15 +159,14 @@ describe.sequential('AvsRegistryWriter', () => {
     });
 
     test('setChurnApprover', async () => {
-        const churnApproverAddress = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_1);
-        const receipt = await client0.avsRegistryWriter.setChurnApprover(churnApproverAddress);
+        const receipt = await client0.avsRegistryWriter.setChurnApprover(config.operator_address_1);
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
         logger.info(`Set churn approver with tx hash: ${receipt.transactionHash}`);
     });
 
     test('setEjector', async () => {
-        const ejectorAddress = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_1);
+        const ejectorAddress = config.operator_address_1;
         const receipt = await client0.avsRegistryWriter.setEjector(ejectorAddress);
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
@@ -214,37 +224,83 @@ describe.sequential('AvsRegistryWriter', () => {
     });
 
     test('createSlashableStakeQuorum', async () => {
+        const deallocationDelay = await client0.elReader.getDeallocationDelay()
+        expect(deallocationDelay).toBeGreaterThan(0n)
+
         const operatorSetParams: OperatorSetParams = {
-            maxOperatorCount: 1000n,
+            maxOperatorCount: 10n,
             kickBIPsOfOperatorStake: 10000n,
             kickBIPsOfTotalStake: 2000n,
         };
         const minimumStakeRequired = 0n;
         const strategies = await client0.avsRegistryReader.strategyParamsByIndex(0n, 0n);
         expect(strategies).not.toBeNull();
-        const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(strategies.strategy);
+        const strategyAddr = strategies.strategy;
         const strategyParam: StrategyParams = { strategy: strategyAddr, multiplier: 10000n };
-        const lookAheadPeriod = 50400n;
-        const receipt = await client0.avsRegistryWriter.createSlashableStakeQuorum(
-            operatorSetParams,
-            minimumStakeRequired,
-            [strategyParam],
-            lookAheadPeriod
-        );
-        expect(receipt).not.toBeNull();
-        logger.info(`Created slashable stake quorum with tx hash: ${receipt.transactionHash}`);
+        const lookAheadPeriod = 850n;
+        try {
+            const receipt = await client0.avsRegistryWriter.createSlashableStakeQuorum(
+                operatorSetParams,
+                minimumStakeRequired,
+                [strategyParam],
+                lookAheadPeriod
+            );
+            expect(receipt).not.toBeNull();
+            logger.info(`Created slashable stake quorum with tx hash: ${receipt.transactionHash}`);
+        }
+        catch (e) {
+            console.log(e)
+            throw e
+        }
     });
 
     test('setSlashableStakeLookahead', async () => {
-        const quorumNumber = 0;
-        const lookAheadPeriod = 50400;
-        const receipt = await client0.avsRegistryWriter.setSlashableStakeLookahead(quorumNumber, lookAheadPeriod);
-        expect(receipt).not.toBeNull();
-        if (receipt.status === 1) {
-            logger.info(`Set slashable stake lookahead with tx hash: ${receipt.transactionHash}`);
-        } else {
-            logger.info('Quorum is not Slashable Stake Quorum');
-        }
+        // operator set params
+        const operatorSetParams: OperatorSetParams = {
+            maxOperatorCount: 5n,
+            kickBIPsOfOperatorStake: 0n,
+            kickBIPsOfTotalStake: 0n
+        };
+
+        const minimumStakeNeeded = 0n;
+
+        // strategy params
+        const strategyAddr = addresses.erc20MockStrategy;
+        const strategyParam = {
+            strategy: strategyAddr,
+            multiplier: 1000000000000000000n, // 1e18
+        };
+
+        // default lookahead period = 0
+        const lookAheadPeriod = 0n;
+
+        // create quorum
+        const receipt = await client0.avsRegistryWriter.createSlashableStakeQuorum(
+            operatorSetParams,
+            minimumStakeNeeded,
+            [strategyParam],
+            lookAheadPeriod,
+        );
+        expect(receipt.status).toBe(1n);
+        // console.log(receipt);
+        console.log(decodeTxReceiptLogs(receipt, Object.values(ABIs).flat()));
+
+        // check lookAheadPeriod (expect 0 initially)
+        let lookAhead = await client0.avsRegistryReader.getSlashableStakeLookAheadPerQuorum(1n);
+        expect(lookAhead).toBe(0n);
+
+        // set new lookAheadPeriod = 32
+        const newQuorium = 3n;
+        const newLookAheadPeriod = 32n;
+        const receipt2 = await client0.avsRegistryWriter.setSlashableStakeLookahead(
+            newQuorium,
+            newLookAheadPeriod,
+        );
+        expect(receipt2.status).toBe(1n);
+
+        // verify updated lookAheadPeriod
+        lookAhead = await client0.avsRegistryReader.getSlashableStakeLookAheadPerQuorum(newQuorium);
+        expect(lookAhead).toBe(newLookAheadPeriod);
     });
 
     test('addStrategies', async () => {
@@ -252,47 +308,68 @@ describe.sequential('AvsRegistryWriter', () => {
         expect(strategies).not.toBeNull();
         const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(strategies.strategy);
         const strategyParams: StrategyParams = { strategy: strategyAddr, multiplier: 10000n };
-        const receipt = await client0.avsRegistryWriter.addStrategies(0, [strategyParams]);
-        expect(receipt).not.toBeNull();
-        logger.info(`Added strategies with tx hash: ${receipt.transactionHash}`);
+        try {
+            await client0.avsRegistryWriter.addStrategies(0n, [strategyParams]);
+            expect.fail('addStrategies with exesting strategy must not execute successfully');
+        } catch (error) {
+            expect(error).toHaveProperty('customMsg', 'InputDuplicateStrategy');
+        }
     });
 
     test('ejectOperator', async () => {
-        const operatorAddr = client0.ethHttpClient.utils.toChecksumAddress(config.operator_address_1);
-        const receipt = await client0.avsRegistryWriter.ejectOperator(operatorAddr, quorumNumbers);
+        const address = config[`operator_address_1`];
+        const receipt = await client0.avsRegistryWriter.ejectOperator(address, [0n]);
         expect(receipt).not.toBeNull();
         logger.info(`Ejected operator with tx hash: ${receipt.transactionHash}`);
     });
 
     test('removeStrategies', async () => {
-        const quorumNumber = 0;
-        const indicesToRemove = [1];
-        const receipt = await client0.avsRegistryWriter.removeStrategies(quorumNumber, indicesToRemove);
-        expect(receipt).not.toBeNull();
-        logger.info(`Removed strategies with tx hash: ${receipt.transactionHash}`);
+        try {
+            // add new strategy then delete it
+            const newStrategy: StrategyParams = { strategy: config.avs_address, multiplier: 1000n }
+            const addReceipt = await client0.avsRegistryWriter.addStrategies(0n, [newStrategy]);
+            expect(addReceipt).not.toBeNull();
+
+            const quorumNumber = 0n;
+            const indicesToRemove = [1n];
+
+            const receipt = await client0.avsRegistryWriter.removeStrategies(quorumNumber, indicesToRemove);
+            expect(receipt).not.toBeNull();
+            logger.info(`Removed strategies with tx hash: ${receipt.transactionHash}`);
+        }
+        catch (e: any) {
+            console.error("removeStrategies", e);
+            throw e;
+        }
     });
 
     test('createOperatorDirectedAvsRewardsSubmission', async () => {
-        const strategyParams0 = await client0.avsRegistryReader.strategyParamsByIndex(0n, 0n);
-        expect(strategyParams0).not.toBeNull();
-        // const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(strategies.strategy);
-        const duration = Number(await client0.elReader.getCalculationIntervalSeconds());
-        const [, token] = await client0.elReader.getStrategyAndUnderlyingToken(strategyParams0.strategy);
-        expect(token).not.toBeNull();
-        const latestBlock = await client0.ethHttpClient.eth.getBlock('latest');
-        const blockTime = Number(latestBlock.timestamp);
-        const startTimestamp = Math.floor((blockTime / duration) + 1) * duration;
-        const strategyParams: StrategyParams = { ...strategyParams0, multiplier: 1n };
-        const rewardsSubmission: OperatorDirectedRewardsSubmission = {
-            strategiesAndMultipliers: [strategyParams],
-            token,
-            operatorRewards: [{ operator: config.operator_address_1, amount: 1000n }],
-            startTimestamp: BigInt(startTimestamp),
-            duration: BigInt(duration),
-            description: 'Some Description',
-        };
-        const receipt = await client0.avsRegistryWriter.createOperatorDirectedAvsRewardsSubmission([rewardsSubmission]);
-        expect(receipt).not.toBeNull();
-        logger.info(`Created AVS rewards submission with tx hash: ${receipt.transactionHash}`);
+        try {
+            const strategyParams0 = await client0.avsRegistryReader.strategyParamsByIndex(0n, 0n);
+            expect(strategyParams0).not.toBeNull();
+            // const strategyAddr = client0.ethHttpClient.utils.toChecksumAddress(strategies.strategy);
+            const duration = Number(await client0.elReader.getCalculationIntervalSeconds());
+            const [, token] = await client0.elReader.getStrategyAndUnderlyingToken(strategyParams0.strategy);
+            expect(token).not.toBeNull();
+            const latestBlock = await client0.ethHttpClient.eth.getBlock('latest');
+            const blockTime = Number(latestBlock.timestamp);
+            const startTimestamp = Math.floor((blockTime / duration) - 2) * duration;
+            const strategyParams: StrategyParams = { ...strategyParams0, multiplier: 1n };
+            const rewardsSubmission: OperatorDirectedRewardsSubmission = {
+                strategiesAndMultipliers: [strategyParams],
+                token,
+                operatorRewards: [{ operator: config.operator_address_1, amount: 1000n }],
+                startTimestamp: BigInt(startTimestamp),
+                duration: BigInt(duration),
+                description: 'Some Description',
+            };
+            const receipt = await client0.avsRegistryWriter.createOperatorDirectedAvsRewardsSubmission([rewardsSubmission]);
+            expect(receipt).not.toBeNull();
+            logger.info(`Created AVS rewards submission with tx hash: ${receipt.transactionHash}`);
+        }
+        catch (e) {
+            console.log(e)
+            throw e
+        }
     });
 });

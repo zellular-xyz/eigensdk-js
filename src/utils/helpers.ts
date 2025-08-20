@@ -4,7 +4,7 @@ import { AbiItem } from 'web3-utils';
 import { G1Point, G2Point } from '../crypto/bls/attestation';
 import * as ethUtil from "ethereumjs-util"
 
-const web3 = new Web3()
+const web3 = new Web3("http://localhost:8545")
 const defaultAbiCoder = new ethers.AbiCoder();
 
 export function bigIntCmp(a: any, b: any){
@@ -144,4 +144,9 @@ export function jsonDecode(jsonStr: string) {
         }
         return value;
     });
+}
+
+export function obj2arr<T extends unknown[]>(obj: any): T {
+    const length = Object.keys(obj).length;
+    return Array.from({ length }, (_, i) => obj[i]) as T;
 }

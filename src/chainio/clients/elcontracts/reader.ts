@@ -7,6 +7,7 @@ import {
     Uint8, BlockNumber, Uint16, OperatorSet, 
     SlashableStake 
 } from '../../../types/general';
+import { obj2arr } from '../../../utils/helpers.js';
 
 
 type AllocationInfo = {
@@ -90,10 +91,12 @@ export class ELReader {
         strategyAddr?: string
     ): Promise<AllocationInfo[]> {
         try {
-            const [sets, allocations]: [[string, bigint][], [bigint, bigint, bigint][]] =
-                await this.allocationManager.methods
-                    .getStrategyAllocations(operatorAddr, strategyAddr)
-                    .call();
+            const result:any = await this.allocationManager.methods
+                .getStrategyAllocations(operatorAddr, strategyAddr)
+                .call();
+            const sets: [string, bigint][] = obj2arr(result[0]).map(r => obj2arr(r));
+            const allocations: [bigint, bigint, bigint][] = obj2arr(result[1]).map(r => obj2arr(r));
+                
             return sets.map(([avs, id], index) => ({
                 operatorSetId: id,
                 avsAddress: avs,
@@ -101,7 +104,7 @@ export class ELReader {
                 pendingDiff: allocations[index][1], // uint96 as string
                 effectBlock: allocations[index][2]
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getAllocationInfo: ${error.message}`);
             throw error;
         }
@@ -136,11 +139,13 @@ export class ELReader {
 
     async getAllocationDelay(operatorAddr: string | null): Promise<Uint32> {
         try {
-            const [isSet, delay]: [boolean, Uint32] = await this.allocationManager.methods
+            const [isSet, delay]: [boolean, Uint32] = obj2arr(
+                await this.allocationManager.methods
                 .getAllocationDelay(operatorAddr)
-                .call();
+                .call()
+            )
             return isSet ? delay : 0n;
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getAllocationDelay: ${error.message}`);
             throw error;
         }
@@ -148,11 +153,15 @@ export class ELReader {
 
     async getRegisteredSets(operatorAddr: string | null): Promise<OperatorSet[]> {
         try {
-            const result: [Uint32, string][] = await this.allocationManager.methods
-                .getRegisteredSets(operatorAddr)
-                .call();
-            return result.map(([id, avs]) => ({ id, avs }));
-        } catch (error) {
+            let result: [string, Uint32][] = obj2arr(
+                await this.allocationManager.methods
+                    .getRegisteredSets(operatorAddr)
+                    .call()
+            );
+            // @ts-ignore
+            result = result.map(obj2arr);
+            return result.map(([avs, id]) => ({ id, avs }));
+        } catch (error: any) {
             this.logger.error(`Error in getRegisteredSets: ${error.message}`);
             throw error;
         }
@@ -174,7 +183,7 @@ export class ELReader {
         try {
             const sets: OperatorSet[] = await this.getRegisteredSets(operatorAddr);
             return sets.some(({id, avs}) => id == (operatorSet.id || 0n) && avs == operatorSet.avs);
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in isOperatorSignedWithOperatorSet: ${error.message}`);
             return false;
         }
@@ -299,19 +308,21 @@ export class ELReader {
     // TODO: can be simplified
     async getOperatorDetails(operator: { address: string }): Promise<OperatorDetails> {
         try {
-            const addr = this.web3.utils.toChecksumAddress(operator.address);
-            const [isSet, delay]: [boolean, number] = await this.allocationManager.methods
-                .getAllocationDelay(addr)
+            const result: any = await this.allocationManager.methods
+                .getAllocationDelay(operator.address)
                 .call();
+            const isSet: boolean = result[0];
+            const delay: bigint = result[1];
+
             const delegationApproverAddress: string = await this.delegationManager.methods
-                .delegationApproverSaltIsSpent(addr, '0x' + '00'.repeat(32))
+                .delegationApproverSaltIsSpent(operator.address, '0x' + '00'.repeat(32))
                 .call();
             return {
-                address: addr,
+                address: operator.address,
                 delegationApproverAddress,
-                allocationDelay: isSet ? delay : 0
+                allocationDelay: isSet ? delay : 0n
             };
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getOperatorDetails: ${error.message}`);
             throw error;
         }
@@ -431,10 +442,11 @@ export class ELReader {
         appointeeAddress: string | null
     ): Promise<[string[], string[]]> {
         try {
-            return await this.permissionController.methods
+            const result:any = await this.permissionController.methods
                 .getAppointeePermissions(accountAddress, appointeeAddress)
                 .call();
-        } catch (error) {
+            return [result[0], result[1]]
+        } catch (error: any) {
             this.logger.error(`Error in listAppointeePermissions: ${error.message}`);
             throw error;
         }
@@ -506,12 +518,21 @@ export class ELReader {
     // TODO: Python not matched
     async getCurrentClaimableDistributionRoot(): Promise<DistributionRoot> {
         try {
-            const [root, rewardsCalculationEndTimestamp, activatedAt, disabled]: [Bytes, BlockNumber, BlockNumber, boolean] =
-                await this.rewardCoordinator.methods
-                    .getCurrentClaimableDistributionRoot()
-                    .call();
+            const [
+                root, 
+                rewardsCalculationEndTimestamp, 
+                activatedAt, 
+                disabled
+            ]:[
+                Bytes,
+                Uint32,
+                Uint32,
+                boolean
+            ] = obj2arr(
+                await this.rewardCoordinator.methods.getCurrentClaimableDistributionRoot().call()
+            );
             return { root, rewardsCalculationEndTimestamp, activatedAt, disabled };
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getCurrentClaimableDistributionRoot: ${error.message}`);
             throw error;
         }
@@ -876,16 +897,13 @@ export class ELReader {
                 .getAllocatedSets(operatorAddress)
                 .call();
             return result.length;
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getNumOperatorSetsForOperator: ${error.message}`);
             throw error;
         }
     }
 
-    async getSlashableShares(operatorAddress: string, operatorSet: OperatorSet, strategies: string[]): Promise<{ [key: string]: Uint256 } | null> {
-        if (!operatorAddress) {
-            return null;
-        }
+    async getSlashableShares(operatorAddress: string, operatorSet: OperatorSet, strategies: string[]): Promise<{ [key: string]: Uint256 }> {
         try {
             const result: Uint256[][] = await this.allocationManager.methods
                 .getMinimumSlashableStake(
@@ -900,7 +918,7 @@ export class ELReader {
                 stakes[strategies[index]] = stake; // Safe for small uint96 values
             });
             return stakes;
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in getSlashableShares: ${error.message}`);
             throw error;
         }

@@ -1,5 +1,5 @@
 import { Address, Contract, utils, Web3 } from 'web3';
-import { ethers } from 'ethers'
+import { ethers, Result } from 'ethers'
 import { Logger } from 'pino'
 import * as ABIs from '../../../contracts/ABIs'
 import * as chainioUtils from '../../utils'
@@ -18,9 +18,11 @@ import {
     Uint32,
     Uint192,
     Uint256,
-    Bytes
+    Bytes,
+    Operator
 } from '../../../types/general';
 import { G1Point, G2Point } from '../../../crypto/bls/attestation';
+import { obj2arr } from '../../../utils/helpers.js';
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000n
 
@@ -71,14 +73,15 @@ export class AvsRegistryReader {
     }
 
     async getOperatorsStakeInQuorumsOfOperatorAtBlock(operatorId: string, blockNumber: BlockNumber): Promise<[number[], OperatorStateRetrieverOperator[][]]> {
-        // @ts-ignore
-        const [quorumBitmap, operatorStakes] = await this.operatorStateRetriever.methods["getOperatorState(address,bytes32,uint32)"](
+        const result:any = await this.operatorStateRetriever.methods["getOperatorState(address,bytes32,uint32)"](
             this.registryCoordinatorAddr,
             operatorId,
             blockNumber
         ).call();
+        const quorumBitmap = result[0];
+        const operatorStakes = result[1];
 
-        const quorums = this.bitmapToQuorumIds(quorumBitmap);
+        const quorums = chainioUtils.bitmapToQuorumIds(quorumBitmap);
         return [
             quorums,
             operatorStakes.map((quorum: any[]) =>
@@ -115,7 +118,9 @@ export class AvsRegistryReader {
     }
 
     async strategyParamsByIndex(quorumNumber: QuorumNum, index: Uint256): Promise<StrategyParams> {
-        const result:[string, Uint96] = await this.stakeRegistry.methods.strategyParamsByIndex(quorumNumber, index).call();
+        const result:[string, Uint96] = obj2arr(
+            await this.stakeRegistry.methods.strategyParamsByIndex(quorumNumber, index).call()
+        );
         return {
             strategy: result[0],
             multiplier: result[1],
@@ -145,7 +150,9 @@ export class AvsRegistryReader {
     }
 
     async getStakeUpdateAtIndex(operatorId: string, quorumNumber: QuorumNum, index: Uint256): Promise<StakeUpdate> {
-        const update: [Uint32, Uint32, Uint96] = await this.stakeRegistry.methods.getStakeUpdateAtIndex(quorumNumber, operatorId, index).call();
+        const update: [Uint32, Uint32, Uint96] = obj2arr(
+            await this.stakeRegistry.methods.getStakeUpdateAtIndex(quorumNumber, operatorId, index).call()
+        );
         return {
             updateBlockNumber: update[0],
             nextUpdateBlockNumber: update[1],
@@ -190,7 +197,9 @@ export class AvsRegistryReader {
     }
 
     async getTotalStakeUpdateAtIndex(quorumNumber: QuorumNum, index: Uint256): Promise<StakeUpdate> {
-        const update:[Uint32, Uint32, Uint96] = await this.stakeRegistry.methods.getTotalStakeUpdateAtIndex(quorumNumber, index).call();
+        const update:[Uint32, Uint32, Uint96] = obj2arr(
+            await this.stakeRegistry.methods.getTotalStakeUpdateAtIndex(quorumNumber, index).call()
+        );
         return {
             updateBlockNumber: update[0],
             nextUpdateBlockNumber: update[1],
@@ -271,12 +280,16 @@ export class AvsRegistryReader {
     }
 
     async getPubkeyFromOperatorAddress(operatorAddress: string): Promise<G1Point> {
-        const operatorPubkey: [Uint256, Uint256] = await this.blsApkRegistry.methods.operatorToPubkey(operatorAddress).call();
+        const operatorPubkey: [Uint256, Uint256] = obj2arr(
+            await this.blsApkRegistry.methods.operatorToPubkey(operatorAddress).call()
+        );
         return new G1Point(operatorPubkey[0], operatorPubkey[1]);
     }
 
     async getApkUpdate(quorumNumber: QuorumNum, index: Uint256): Promise<ApkUpdate> {
-        const update:[Bytes, Uint32, Uint32] = await this.blsApkRegistry.methods.apkHistory(quorumNumber, index).call();
+        const update:[Bytes, Uint32, Uint32] = obj2arr(
+            await this.blsApkRegistry.methods.apkHistory(quorumNumber, index).call()
+        );
         return {
             apkHash: update[0],
             updateBlockNumber: update[1],
@@ -285,7 +298,9 @@ export class AvsRegistryReader {
     }
 
     async getCurrentApk(quorumNumber: QuorumNum): Promise<G1Point> {
-        const apk: [Uint256, Uint256] = await this.blsApkRegistry.methods.currentApk(quorumNumber).call();
+        const apk: [Uint256, Uint256] = obj2arr(
+            await this.blsApkRegistry.methods.currentApk(quorumNumber).call()
+        );
         return new G1Point(apk[0], apk[1]);
     }
 
@@ -381,23 +396,15 @@ export class AvsRegistryReader {
             });
 
             for (const log of decodedLogs) {
-                // operatorAddresses.push(update.operator);
-                // operatorPubkeys.push({
-                //     g1PubKey: { x: update.pubkeyG1.X, y: update.pubkeyG1.Y },
-                //     g2PubKey: {
-                //         X: [update.pubkeyG2.X[0], update.pubkeyG2.X[1]],
-                //         Y: [update.pubkeyG2.Y[0], update.pubkeyG2.Y[1]],
-                //     },
-                // });
                 if (log) {
                     const operatorAddr = log.args.operator as string;
                     const pubkeyG1 = log.args.pubkeyG1 as [bigint, bigint];
-                    const pubkeyG2 = log.args.pubkeyG2 as { x: [bigint, bigint]; y: [bigint, bigint] };
+                    const pubkeyG2 = log.args.pubkeyG2 as { X: [bigint, bigint]; Y: [bigint, bigint] };
                     operatorPubkeys.push({
                         g1PubKey: new G1Point(pubkeyG1[0], pubkeyG1[1]),
                         g2PubKey: new G2Point(
-                            pubkeyG2.x[0], pubkeyG2.x[1],
-                            pubkeyG2.y[0], pubkeyG2.y[1]
+                            pubkeyG2.X[0], pubkeyG2.X[1],
+                            pubkeyG2.Y[0], pubkeyG2.Y[1]
                         )
                     });
                     operatorAddresses.push(operatorAddr);
