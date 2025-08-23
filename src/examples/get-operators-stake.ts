@@ -8,7 +8,7 @@ async function run() {
 		'0xD5D7fB4647cE79740E6e83819EFDf43fa74F8C31'
 	)
 
-	const logger = pino({ level: 'info' });
+	const logger = pino({ level: 'silent' });
 
 	const clients = await buildAll(config, "01".padStart(64, '0'), logger)
 

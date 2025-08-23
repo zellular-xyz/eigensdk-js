@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { BuildAllConfig, Clients, buildAll } from '../chainio/clients/builder';
-import { ContractAddresses, getContractAddressesFromContractRegistry } from './utils/anvil.js';
+import { getContractAddressesFromContractRegistry } from './utils/anvil.js';
+import { ContractAddresses } from '../types/general.js';
 
 
 export type TestConfigs = {

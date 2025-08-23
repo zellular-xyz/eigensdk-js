@@ -12,10 +12,13 @@ import { operatorIdFromG1Pubkey } from '../types/operator.js';
 import { RegistrationType } from './clients/elcontracts/writer.js';
 
 const logger = pino({
-    level: process.env.LOG_LEVEL || 'info', // Set log level here
-    // prettyPrint: { colorize: true }
+    level: process.env.LOG_LEVEL || 'silent', // Set log level here
     transport: {
-        target: 'pino-pretty'
+        target: 'pino-pretty',
+        options: { 
+            colorize: true,
+            sync: true // Ensure pino-pretty is synchronous
+        }
     },
 });
 

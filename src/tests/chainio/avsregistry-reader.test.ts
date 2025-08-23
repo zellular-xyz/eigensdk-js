@@ -11,7 +11,8 @@ import {
     StakeUpdate,
     StrategyParams,
     Uint32,
-    Uint96
+    Uint96,
+    ContractAddresses
 } from '../../types/general';
 import { Clients } from '../../chainio/clients/builder.js';
 import * as testUtils from '../utils/anvil.js';
@@ -24,7 +25,7 @@ function isStakeUpdate(obj: any): boolean {
 
 describe.sequential('AvsRegistryReader', () => {
     let clients: Clients[];
-    let addresses: testUtils.ContractAddresses;
+    let addresses: ContractAddresses;
     let client0: Clients;
     let operatorId: string;
 

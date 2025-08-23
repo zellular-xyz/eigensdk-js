@@ -8,7 +8,7 @@ import * as ABIs from '../../contracts/ABIs'
 import { describe, test, expect, beforeAll } from 'vitest';
 import pino from 'pino';
 import { timeout } from '../utils/test-utils.js';
-import { Operator, OperatorSet, OperatorSetParams, StrategyParams, Uint16, Uint32, Uint256 } from '../../types/general.js';
+import { Operator, OperatorSet, OperatorSetParams, StrategyParams, Uint16, Uint32, Uint256, ContractAddresses } from '../../types/general.js';
 import { GenericContainer, TestContainer } from 'testcontainers';
 import { abiEncodeNormalRegistrationParams, abiEncodeRegistrationWithChurnParams, arrayify, PubkeyRegistrationParams, sendContractCall } from '../../chainio/utils.js';
 import { OperatorKickParam, RegistrationRequest, SignatureWithSaltAndExpiry } from '../../chainio/clients/elcontracts/types.js';
@@ -16,10 +16,13 @@ import { abiEncodeData } from '../../utils/helpers.js';
 import { ClaimCheckParams, ELReader } from '../../chainio/clients/elcontracts/reader.js';
 
 const logger = pino({
-    level: 'info', // Set log level here
-    // prettyPrint: { colorize: true }
+    level: 'silent', // Set log level here
     transport: {
-        target: 'pino-pretty'
+        target: 'pino-pretty',
+        options: { 
+            colorize: true,
+            sync: true // Ensure pino-pretty is synchronous
+        }
     },
 });
 
@@ -28,7 +31,7 @@ describe("elwriter tests", async () => {
 
     describe('RegisterOperator', () => {
         let clients: Clients[];
-        let addresses: testUtils.ContractAddresses;
+        let addresses: ContractAddresses;
         let client0: Clients;
         let container: GenericContainer;
         let endpoint: string;
@@ -1145,7 +1148,7 @@ describe("elwriter tests", async () => {
         // const { endpoint } = await testUtils.startAnvilContainer(testConfigs.anvilStateFileName);
 
         // const ADDR_ZERO = "0x" + "00".repeat(20);
-        // const invalidAddresses: testUtils.ContractAddresses = {
+        // const invalidAddresses: ContractAddresses = {
         //     registryCoordinator: ADDR_ZERO,
         //     operatorStateRetriever: ADDR_ZERO,
         //     rewardsCoordinator: ADDR_ZERO,

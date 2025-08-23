@@ -4,17 +4,20 @@ import * as chainIoUtils from '../../chainio/utils.js'
 import * as testUtils from '../utils/anvil.js';
 import { describe, test, expect, beforeAll } from 'vitest';
 import { init as attestationInit } from '../../crypto/bls/attestation.js';
-import { OperatorSet, OperatorSetParams, SlashableStake } from '../../types/general.js';
+import { ContractAddresses, OperatorSet, OperatorSetParams, SlashableStake } from '../../types/general.js';
 import { Clients } from '../../chainio/clients/builder.js';
 import pino from 'pino';
 import { jsonEncode } from '../../utils/helpers.js';
 import { expectToHaveProps, isObject } from '../utils/test-utils.js';
 
 const logger = pino({
-    level: 'info', // Set log level here
-    // prettyPrint: { colorize: true }
+    level: 'silent', // Set log level here
     transport: {
-        target: 'pino-pretty'
+        target: 'pino-pretty',
+        options: { 
+            colorize: true,
+            sync: true // Ensure pino-pretty is synchronous
+        }
     },
 });
 
@@ -42,7 +45,7 @@ interface SlashableShares {
 
 describe('ELReader', () => {
     let clients: Clients[];
-    let addresses: testUtils.ContractAddresses;
+    let addresses: ContractAddresses;
     let client0: Clients;
 
     beforeAll(async () => {

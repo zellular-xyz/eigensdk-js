@@ -19,6 +19,18 @@ export type TaskIndex = Uint32;
 export type Exception = { message: string, code: number };
 export type LocalAccount = { address: string; privateKey: string }
 
+export type ContractAddresses = {
+    registryCoordinator: string,
+    operatorStateRetriever: string,
+    rewardsCoordinator: string,
+    permissionController?: string, // Optional for non-M2 version
+    serviceManager: string,
+    allocationManager: string,
+    delegationManager: string,
+    avsAddress: string,
+    erc20MockStrategy: string,
+}
+
 export type Operator = {
     address: Address,
     earningsReceiverAddress: Address, // default: ""

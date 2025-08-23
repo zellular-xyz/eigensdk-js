@@ -13,7 +13,7 @@ import { loadLocalAccount } from '../utils.js';
 import { obj2arr } from '../../utils/helpers.js';
 
 const logger = pino({ 
-	level: process.env.LOG_LEVEL || 'info',
+	level: process.env.LOG_LEVEL || 'silent',
 	transport: {
 		target: 'pino-pretty',
         options: { 

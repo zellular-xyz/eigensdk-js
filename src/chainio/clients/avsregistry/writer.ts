@@ -17,7 +17,7 @@ import { signRawData } from "../../../utils/helpers";
 
 const DEFAULT_QUERY_BLOCK_RANGE = 10_000;
 const logger = pino({ 
-    level: process.env.LOG_LEVEL || "info",
+    level: process.env.LOG_LEVEL || "silent",
     name: "AvsRegWriter" 
 })
 

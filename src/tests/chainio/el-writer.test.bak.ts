@@ -4,14 +4,17 @@ import { Clients } from '../../chainio/clients/builder.js';
 import * as testUtils from '../utils/anvil.js';
 import { init as attestationInit, KeyPair } from '../../crypto/bls/attestation.js';
 import { describe, test, expect, beforeAll } from 'vitest';
-import { Uint32 } from '../../types/general.js';
+import { ContractAddresses, Uint32 } from '../../types/general.js';
 import pino from 'pino';
 
 const logger = pino({
-    level: 'info', // Set log level here
-    // prettyPrint: { colorize: true }
+    level: 'silent', // Set log level here
     transport: {
-        target: 'pino-pretty'
+        target: 'pino-pretty',
+        options: { 
+            colorize: true,
+            sync: true // Ensure pino-pretty is synchronous
+        }
     },
 });
 
@@ -54,7 +57,7 @@ interface RemoveAdminRequest {
 
 describe('ELWriter', () => {
     let clients: Clients[];
-    let addresses: testUtils.ContractAddresses;
+    let addresses: ContractAddresses;
     let client0: Clients;
 
     beforeAll(async() => {

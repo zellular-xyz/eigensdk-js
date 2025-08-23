@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as ABIs from '../../contracts/ABIs'
+import { ContractAddresses } from '../../types/general.js';
 
 // Promisify exec for async command execution
 const execAsync = promisify(exec);
@@ -16,19 +17,6 @@ export const ANVIL_SECOND_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 export const ANVIL_SECOND_PRIVATE_KEY = '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
 export const ANVIL_THIRD_ADDRESS = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
 export const ANVIL_THIRD_PRIVATE_KEY = '5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
-
-// Interface for ContractAddresses (equivalent to Go struct)
-export interface ContractAddresses {
-    registryCoordinator: string;
-    operatorStateRetriever: string;
-    rewardsCoordinator: string;
-    permissionController?: string; // Optional for non-M2 version
-    serviceManager: string;
-    allocationManager: string;
-    delegationManager: string;
-    avsAddress: string,
-    erc20MockStrategy: string;
-}
 
 // Minimal ABI for ContractsRegistry contract
 const contractsRegistryAbi = [

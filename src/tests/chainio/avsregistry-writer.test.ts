@@ -4,7 +4,8 @@ import { describe, test, expect, beforeAll, } from 'vitest';
 import { G1Point, KeyPair, init as attestationInit } from '../../crypto/bls/attestation.js';
 import {
     Operator, OperatorSetParams, RewardsSubmission,
-    OperatorDirectedRewardsSubmission, StrategyParams
+    OperatorDirectedRewardsSubmission, StrategyParams,
+    ContractAddresses
 } from '../../types/general.js';
 import * as ABIs from '../../contracts/ABIs'
 import pino from 'pino';
@@ -13,10 +14,14 @@ import * as testUtils from '../utils/anvil.js';
 import { decodeTxReceiptLogs } from '../../utils/helpers.js';
 
 const logger = pino({
-    level: 'info', // Set log level here
+    level: 'silent', // Set log level here
     // prettyPrint: { colorize: true }
     transport: {
-        target: 'pino-pretty'
+        target: 'pino-pretty',
+        options: { 
+            colorize: true,
+            sync: true // Ensure pino-pretty is synchronous
+        }
     },
 });
 
@@ -26,7 +31,7 @@ const timeout = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)
 
 describe.sequential('AvsRegistryWriter', () => {
     let clients: Clients[];
-    let addresses: testUtils.ContractAddresses;
+    let addresses: ContractAddresses;
     let client0: Clients;
 
     beforeAll(async () => {
