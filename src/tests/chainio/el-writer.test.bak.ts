@@ -1,23 +1,25 @@
-import { Web3 } from 'web3';
-import { buildClients, config } from '../builder';
-import { Clients } from '../../chainio/clients/builder.js';
-import * as testUtils from '../utils/anvil.js';
-import { init as attestationInit, KeyPair } from '../../crypto/bls/attestation.js';
-import { describe, test, expect, beforeAll } from 'vitest';
-import { ContractAddresses, Uint32 } from '../../types/general.js';
-import pino from 'pino';
+import { Web3 } from "web3";
+import { buildClients, config } from "../builder";
+import { Clients } from "../../chainio/clients/builder.js";
+import * as testUtils from "../utils/anvil.js";
+import {
+    init as attestationInit,
+    KeyPair,
+} from "../../crypto/bls/attestation.js";
+import { describe, test, expect, beforeAll } from "vitest";
+import { ContractAddresses, Uint32 } from "../../types/general.js";
+import pino from "pino";
 
 const logger = pino({
-    level: 'silent', // Set log level here
+    level: "silent", // Set log level here
     transport: {
-        target: 'pino-pretty',
-        options: { 
+        target: "pino-pretty",
+        options: {
             colorize: true,
-            sync: true // Ensure pino-pretty is synchronous
-        }
+            sync: true, // Ensure pino-pretty is synchronous
+        },
     },
 });
-
 
 // Define TypeScript interfaces for Python dictionaries
 interface DeregisterRequest {
@@ -53,24 +55,24 @@ interface RemoveAdminRequest {
     adminAddress: string;
 }
 
-
-
-describe('ELWriter', () => {
+describe("ELWriter", () => {
     let clients: Clients[];
     let addresses: ContractAddresses;
     let client0: Clients;
 
-    beforeAll(async() => {
+    beforeAll(async () => {
         await attestationInit();
-        
-        const testConfigs = testUtils.getDefaultTestConfig(); 
-        const {container, endpoint} = await testUtils.startAnvilContainer(testConfigs.anvilStateFileName);
 
-        ({clients, addresses} = await buildClients(endpoint));
+        const testConfigs = testUtils.getDefaultTestConfig();
+        const { container, endpoint } = await testUtils.startAnvilContainer(
+            testConfigs.anvilStateFileName,
+        );
+
+        ({ clients, addresses } = await buildClients(endpoint));
         client0 = clients[0];
-    }); 
+    });
 
-    describe("")
+    describe("");
 
     // test('deregisterFromOperatorSets', async () => {
     //     const operatorAddress = config.operator_address_1;
@@ -103,12 +105,12 @@ describe('ELWriter', () => {
     // test('updateMetadataUri', async () => {
     //     const operatorAddr = config.operator_address_1;
     //     const metadataUri = 'https://example.com/updated-metadata-uri';
-        
+
     //     const receipt = await client0.elWriter.updateMetadataUri(operatorAddr, metadataUri);
     //     expect(receipt).not.toBeNull();
     //     expect(receipt.status).toBe(1n);
     //     logger.info(`Updated metadata URI with tx hash: ${receipt.transactionHash}`);
-            
+
     // });
 
     // test('depositErc20IntoStrategy', async () => {
@@ -158,20 +160,26 @@ describe('ELWriter', () => {
     //     logger.info(`Cleared deallocation queue with tx hash: ${receipt.transactionHash}`);
     // });
 
-    test('setAllocationDelay', async () => {
+    test("setAllocationDelay", async () => {
         const operatorAddr = config.operator_address_1;
 
         const delay = 10n;
-        const receipt = await client0.elWriter.setAllocationDelay(operatorAddr, delay);
+        const receipt = await client0.elWriter.setAllocationDelay(
+            operatorAddr,
+            delay,
+        );
         expect(receipt).not.toBeNull();
         expect(receipt.status).toBe(1n);
 
-        console.log({operatorAddr, delay})
+        console.log({ operatorAddr, delay });
 
-        const allocationDelay = await client0.elReader.getAllocationDelay(operatorAddr);
+        const allocationDelay =
+            await client0.elReader.getAllocationDelay(operatorAddr);
         expect(allocationDelay).toBe(delay);
 
-        logger.info(`Set allocation delay with tx hash: ${receipt.transactionHash}`);
+        logger.info(
+            `Set allocation delay with tx hash: ${receipt.transactionHash}`,
+        );
     });
 
     // test('addPendingAdmin', async () => {

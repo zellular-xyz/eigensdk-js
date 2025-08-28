@@ -1,18 +1,18 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "outDir": "./dist",
-    "rootDir": "./",
-    "allowJs": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
-  },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "outDir": "./dist",
+        "rootDir": "./",
+        "allowJs": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules", "dist"]
 }

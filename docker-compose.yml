@@ -1,21 +1,21 @@
 services:
-  anvil:
-    build: .
-    ports:
-      - "8546:8545"
-    command: scripts/entrypoint.sh
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8545'"]
-      interval: 2s
-      timeout: 1s
-      retries: 10
-  test:
-    build: .
-    volumes:
-      - .:/app
-    environment:
-      - ETH_HTTP_URL=http://anvil:8545
-    depends_on:
-      anvil:
-        condition: service_healthy
-    command: npm run test
+    anvil:
+        build: .
+        ports:
+            - "8546:8545"
+        command: scripts/entrypoint.sh
+        healthcheck:
+            test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8545'"]
+            interval: 2s
+            timeout: 1s
+            retries: 10
+    test:
+        build: .
+        volumes:
+            - .:/app
+        environment:
+            - ETH_HTTP_URL=http://anvil:8545
+        depends_on:
+            anvil:
+                condition: service_healthy
+        command: npm run test
